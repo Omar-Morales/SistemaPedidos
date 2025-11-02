@@ -36,7 +36,6 @@
                                 <thead>
                                     <tr>
                                         <th>ID</th>
-                                        <th>Logo</th>
                                         <th>RUC</th>
                                         <th>Nombre</th>
                                         <th>Correo</th>
@@ -85,12 +84,8 @@
                         <input type="email" class="form-control" id="email" name="email" required>
                     </div>
                     <div class="mb-3">
-                        <label for="phone" class="form-label">Teléfono</label>
+                        <label for="phone" class="form-label">Telefono</label>
                         <input type="text" class="form-control" id="phone" name="phone" maxlength="9">
-                    </div>
-                    <div class="mb-3">
-                        <label for="address" class="form-label">Dirección</label>
-                        <textarea name="address" class="form-control" id="address"></textarea>
                     </div>
                     <!--<div class="mb-3">
                         <label for="status" class="form-label">Estado</label>
@@ -100,17 +95,8 @@
                             <option value="inactive">Inactivo</option>
                         </select>
                     </div>-->
-                    <div class="mb-3">
-                        <label for="photo" class="form-label">Logo (foto)</label>
-                        <input type="file" class="form-control" id="photo" name="photo" accept="image/jpeg,image/png,image/jpg,image/gif">
-                    </div>
-
-                        <!-- Botón para mostrar imagen -->
-                    <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="btnVerLogo" style="display: none;">
-                        Ver logo actual
-                    </button>
-
                 </div>
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary" id="btnGuardarProveedor">Guardar</button>
@@ -118,26 +104,6 @@
             </div>
         </form>
     </div>
-</div>
-
-<!-- Modal para ver logo -->
-<style>
-  #modalVerLogo .modal-dialog {
-    max-width: 400px;
-  }
-</style>
-
-<div class="modal fade" id="modalVerLogo" tabindex="-1" aria-labelledby="modalVerLogoLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-    <div class="modal-header">
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-    </div>
-    <div class="modal-body text-center">
-        <img id="imgLogoModal" src="" alt="Logo del proveedor" class="img-fluid rounded shadow" style="max-height: 300px;">
-    </div>
-    </div>
-  </div>
 </div>
 
 @endsection

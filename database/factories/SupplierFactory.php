@@ -24,8 +24,6 @@ class SupplierFactory extends Factory
             'name' => $this->faker->name(),
             'email' => $this->faker->unique()->safeEmail(),
             'phone' => $this->faker->phoneNumber(),
-            'address' => $this->faker->address(),
-            'photo' => $this->faker->imageUrl(100,100,'people'),
             'status' => $this->faker->randomElement(['active','inactive']),
         ];
     }
