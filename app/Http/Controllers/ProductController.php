@@ -50,6 +50,7 @@ class ProductController extends Controller
             //'status' => 'required|in:available,sold,archived',
             'temp_images' => 'nullable|array',
             'temp_images.*' => 'string',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         $categoria = Category::find($request->category_id);
@@ -98,6 +99,21 @@ class ProductController extends Controller
             }
         }
 
+        if ($request->hasFile('images')) {
+            foreach ((array) $request->file('images') as $image) {
+                if (!$image) {
+                    continue;
+                }
+
+                $imagePath = $image->store('products', 'public');
+
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'image_path' => $imagePath,
+                ]);
+            }
+        }
+
         return response()->json([
             'message' => $reactivated ? 'Producto reactivado correctamente.' : 'Producto creado correctamente.',
             'id' => $product->id,
@@ -113,6 +129,26 @@ class ProductController extends Controller
         return response()->json($product);*/
 
     $product = Product::with('images')->findOrFail($id);
+
+    $product->images->transform(function($image) {
+        $hasFile = $image->image_path && \Storage::disk('public')->exists($image->image_path);
+        $image->url = $hasFile
+            ? asset('storage/' . $image->image_path)
+            : asset('assets/images/product.png');
+        $image->is_placeholder = !$hasFile;
+
+        return $image;
+    });
+
+    if ($product->images->isEmpty()) {
+        $product->images->push((object) [
+            'id' => null,
+            'product_id' => $product->id,
+            'image_path' => null,
+            'url' => asset('assets/images/product.png'),
+            'is_placeholder' => true,
+        ]);
+    }
     $categoriesQuery = Category::query();
     // Incluir la categoría del producto incluso si está inactiva
     $categoriesQuery->where(function ($q) use ($product) {
@@ -228,7 +264,7 @@ class ProductController extends Controller
                 $url = asset('assets/images/product.png');
             }
 
-            return '<img src="' . $url . '" class="img-thumbnail" width="30" alt="Imagen de producto">';
+            return '<img src="' . $url . '" class="custom-thumbnail" width="30" alt="Imagen de ' . e($product->name) . '">';
         })
         ->addColumn('category_name', fn($product) => $product->category->name ?? 'Sin Categoría')
 
@@ -363,3 +399,4 @@ public function list(Request $request)
 }
 
 }
+

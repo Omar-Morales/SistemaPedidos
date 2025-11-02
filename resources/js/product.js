@@ -122,73 +122,49 @@ $(document).ready(() => {
   });
 });*/
 
-// Dropzone Global
-let myDropzone = null;
-let suppressRemoveEvent = false;
-function initDropzone(productId = null, images = []) {
-  if (myDropzone) {
-    suppressRemoveEvent = true;
-    myDropzone.removeAllFiles(true);  // elimina archivos sin disparar evento removedfile
-    myDropzone.destroy();
-    myDropzone = null;
-    suppressRemoveEvent = false;
+// Manejo de imagenes
+const defaultProductImage = '/assets/images/product.png';
+const $imagesInput = $('#images');
+const $viewProductImageBtn = $('#btnVerImagenProducto');
+const modalVerImagenProductoElement = document.getElementById('modalVerImagenProducto');
+const modalVerImagenProducto = modalVerImagenProductoElement ? new bootstrap.Modal(modalVerImagenProductoElement) : null;
+
+function setProductImageButton(imageUrl = null) {
+  if (!$viewProductImageBtn.length) return;
+
+  if (imageUrl) {
+    $viewProductImageBtn.data('image-url', imageUrl).show();
+  } else {
+    $viewProductImageBtn.removeData('image-url').hide();
+  }
+}
+
+function resetProductImageSelection() {
+  if ($imagesInput.length) {
+    $imagesInput.val('');
   }
 
-  myDropzone = new Dropzone("#dropzoneImages", {
-    url: productId ? `/products/${productId}/images/upload` : '/products/images/temp-upload',
-    paramName: "file",
-    maxFilesize: 2,
-    acceptedFiles: "image/*",
-    addRemoveLinks: true,
-    dictRemoveFile: "Eliminar",
-    dictDefaultMessage: "Sube tus imágenes aquí.",
-    headers: {
-      'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-    },
-    init: function() {
-      const dz = this;
+  setProductImageButton(null);
+}
 
-      suppressRemoveEvent = true;
+function resolveProductImageUrl(images = []) {
+  if (!Array.isArray(images) || !images.length) {
+    return defaultProductImage;
+  }
 
-      images.forEach(img => {
-        const mockFile = {
-          name: img.image_path.split('/').pop(),
-          size: 12345,
-          serverId: img.id,
-          accepted: true
-        };
-        dz.emit("addedfile", mockFile);
-        dz.emit("thumbnail", mockFile, `/storage/${img.image_path}`);
-        dz.emit("complete", mockFile);
-        dz.files.push(mockFile);
-      });
+  const realImage = images.find(img => !img.is_placeholder && img && img.url);
+  const selectedImage = realImage || images[0];
 
-      suppressRemoveEvent = false;
+  return (selectedImage && selectedImage.url) || defaultProductImage;
+}
 
-      dz.on("success", function(file, response) {
-        file.serverId = response.id;
-      });
+if ($viewProductImageBtn.length && modalVerImagenProducto) {
+  $viewProductImageBtn.on('click', () => {
+    const url = $viewProductImageBtn.data('image-url');
+    if (!url) return;
 
-      dz.on("removedfile", function(file) {
-        if (suppressRemoveEvent) return;
-
-        if (file.serverId && productId) {
-          axios.post(`/products/${productId}/images/delete`, { id: file.serverId })
-            .then(() => {
-                table.ajax.reload(null, false); // ✅ recargar tabla después de borrar imagen
-            })
-            .catch(() => alert("Error al eliminar imagen"));
-        }
-      });
-
-      dz.on("processing", function(file) {
-        $('#btnGuardarProducto').prop('disabled', true);
-      });
-
-      dz.on("queuecomplete", function() {
-        $('#btnGuardarProducto').prop('disabled', false);
-      });
-    }
+    $('#imgProductoModal').attr('src', url);
+    modalVerImagenProducto.show();
   });
 }
 //Select de categoria
@@ -243,78 +219,69 @@ function cargarCategoriasEnSelect(idSeleccionado = null, callback = null) {
     });
 }
 
-$('#modalProducto').on('hidden.bs.modal', function () {
-    if (myDropzone) {
-        suppressRemoveEvent = true;
-        myDropzone.removeAllFiles(true); // borra sin llamar a backend
-        myDropzone.destroy();
-        myDropzone = null;
-        suppressRemoveEvent = false;
-    }
+$('#modalProducto').on('hidden.bs.modal', () => {
+  resetProductImageSelection();
 });
 
 
 // Crear producto
 $('#btnCrearProducto').on('click', async () => {
   $('#formProducto')[0].reset();
+  resetProductImageSelection();
   $('#producto_id').val('');
   $('#modalProductoLabel').text('Nuevo Producto');
-  $('#previewImages').empty();
   //$('#category_id').val(null).trigger('change');
   //$('#category_id, #status').val(null).trigger('change');
 
   modal.show();
   $('#modalProducto .modal-content').append('<div id="cargandoOverlay" class="modal-loading-overlay"></div>');
 
-    try {
-        await new Promise(resolve => cargarCategoriasEnSelect(null, resolve));
-        initDropzone();
-    } catch (error) {
-        console.error('Error al cargar categorías:', error);
-        Toastify({
-            text: 'No se pudo cargar las categorías',
-            duration: 3000,
-            gravity: 'top',
-            position: 'right',
-            style: { background: '#dc3545' }
-        }).showToast();
-    }finally {
-        $('#cargandoOverlay').remove(); // Quitar overlay de bloqueo
-    }
+  try {
+    await new Promise(resolve => cargarCategoriasEnSelect(null, resolve));
+  } catch (error) {
+    console.error('Error al cargar categor��as:', error);
+    Toastify({
+      text: 'No se pudo cargar las categor��as',
+      duration: 3000,
+      gravity: 'top',
+      position: 'right',
+      style: { background: '#dc3545' }
+    }).showToast();
+  } finally {
+    $('#cargandoOverlay').remove();
+  }
 });
-
 // Editar producto
-// Editar producto - Abrir modal
-$(document).on('click', '.edit-btn',async function() {
+$(document).on('click', '.edit-btn', async function() {
   const id = $(this).data('id');
+  resetProductImageSelection();
 
-$('#modalProducto .modal-content').append('<div id="cargandoOverlay" class="modal-loading-overlay"></div>');
+  $('#modalProducto .modal-content').append('<div id="cargandoOverlay" class="modal-loading-overlay"></div>');
 
-try {
-        const { data } = await axios.get(`/products/${id}`);
-        const product = data.product;
-        const categories = data.categories;
+  try {
+    const { data } = await axios.get(`/products/${id}`);
+    const product = data.product;
+    const categories = data.categories;
 
     $('#producto_id').val(product.id);
     $('#name').val(product.name);
-    //$('#category_id').val(product.category_id).trigger('change');
     $('#price').val(product.price);
     $('#quantity').val(product.quantity);
-    //$('#status').val(product.status).trigger('change');
+
     const $select = $('#category_id');
-    $select.empty(); // Vaciar opciones actuales
+    $select.empty();
     categories.forEach(cat => {
-        const selected = cat.id === product.category_id ? 'selected' : '';
-        $select.append(`<option value="${cat.id}" ${selected}>${cat.text}</option>`);
+      const selected = cat.id === product.category_id ? 'selected' : '';
+      $select.append(`<option value="${cat.id}" ${selected}>${cat.text}</option>`);
     });
     $select.trigger('change');
 
     $('#images').val(null);
+    const imageUrl = resolveProductImageUrl(product.images || []);
+    setProductImageButton(imageUrl);
     $('#modalProductoLabel').text('Editar Producto');
-    initDropzone(product.id, product.images || []);
     modal.show();
-  }
-  catch(error) {
+  } catch (error) {
     Toastify({
       text: "Error al cargar producto",
       duration: 3000,
@@ -322,11 +289,10 @@ try {
       position: "right",
       backgroundColor: "#dc3545"
     }).showToast();
-  }finally {
-        $('#cargandoOverlay').remove();
-    }
+  } finally {
+    $('#cargandoOverlay').remove();
+  }
 });
-
 // Guardar producto
 $('#formProducto').on('submit', function(e){
   e.preventDefault();
@@ -337,18 +303,6 @@ $('#formProducto').on('submit', function(e){
   const fd = new FormData(this);
 
   if (id) fd.append('_method', 'PUT');
-
-  // Agregar los paths temporales de Dropzone al FormData
-  if (myDropzone && myDropzone.files.length) {
-    myDropzone.files.forEach(file => {
-      if (file.xhr) {
-        const response = JSON.parse(file.xhr.response);
-        if (response.path) {
-          fd.append('temp_images[]', response.path);
-        }
-      }
-    });
-  }
 
   axios({
     method,
@@ -363,11 +317,6 @@ $('#formProducto').on('submit', function(e){
       position: "right",
       backgroundColor: "#28a745"
     }).showToast();
-
-    if (!id) {
-      $('#producto_id').val(data.id);
-      initDropzone(data.id); // reinicializar con nuevo ID
-    }
 
     modal.hide();
     table.ajax.reload(null, false);
@@ -423,4 +372,5 @@ $(document).on('click', '.delete-btn', function(e){
     }
   });
 });
+
 

@@ -60,7 +60,7 @@
 <!-- Modal Crear/Editar Producto -->
 <!-- Modal Crear/Editar Producto -->
 <div class="modal fade" id="modalProducto" tabindex="-1" aria-labelledby="modalProductoLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog">
     <form id="formProducto" enctype="multipart/form-data">
       @csrf
       <input type="hidden" id="producto_id" name="producto_id">
@@ -72,48 +72,35 @@
         </div>
 
         <div class="modal-body">
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label for="name" class="form-label">Nombre</label>
-              <input type="text" class="form-control" id="name" name="name" required>
-            </div>
-
-            <div class="col-md-6 mb-3">
-              <label for="category_id" class="form-label">Categoría</label>
-              <select class="form-select" id="category_id" name="category_id" required>
-                <option value="">-- Seleccione --</option>
-              </select>
-            </div>
+          <div class="mb-3">
+            <label for="name" class="form-label">Nombre</label>
+            <input type="text" class="form-control" id="name" name="name" required>
           </div>
 
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label for="price" class="form-label">Precio</label>
-              <input type="number" step="0.01" class="form-control" id="price" name="price" required>
-            </div>
-
-            <div class="col-md-6 mb-3">
-              <label for="quantity" class="form-label">Cantidad</label>
-              <input type="number" class="form-control" id="quantity" name="quantity" required>
-            </div>
-
-          <!--<div class="col-md-4 mb-3">
-            <label for="status" class="form-label">Estado</label>
-            <select class="form-select select2" id="status" name="status" required>
-            <option value="available">Disponible</option>
-            <option value="sold">Vendido</option>
-            <option value="archived">Archivado</option>
+          <div class="mb-3">
+            <label for="category_id" class="form-label">Categoría</label>
+            <select class="form-select" id="category_id" name="category_id" required>
+              <option value="">-- Seleccione --</option>
             </select>
-          </div>-->
+          </div>
 
-            <div class="mb-3">
-            <label for="dropzoneImages" class="form-label">Imágenes (puedes seleccionar varias)</label>
-            <form id="formProducto">
-            <!-- ...otros campos -->
-            <div id="dropzoneImages" class="dropzone border b-2 rounded-3 p-3 bg-light"></div>
-            </form>
-            </div>
+          <div class="mb-3">
+            <label for="price" class="form-label">Precio</label>
+            <input type="number" step="0.01" class="form-control" id="price" name="price" required>
+          </div>
 
+          <div class="mb-3">
+            <label for="quantity" class="form-label">Cantidad</label>
+            <input type="number" class="form-control" id="quantity" name="quantity" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="images" class="form-label">Imagen (modelo)</label>
+            <input type="file" class="form-control" id="images" name="images[]" accept="image/*" multiple>
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="btnVerImagenProducto" style="display: none;">
+              Ver imagen actual
+            </button>
+          </div>
 
         </div>
 
@@ -127,7 +114,12 @@
 </div>
 
 <!-- Modal para ver imagen -->
-<div class="modal fade" id="modalVerImagen" tabindex="-1" aria-labelledby="modalVerImagenLabel" aria-hidden="true">
+<style>
+  #modalVerImagenProducto .modal-dialog {
+    max-width: 400px;
+  }
+</style>
+<div class="modal fade" id="modalVerImagenProducto" tabindex="-1" aria-labelledby="modalVerImagenProductoLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
@@ -145,3 +137,4 @@
 @push('scripts')
 @vite('resources/js/product.js')
 @endpush
+
