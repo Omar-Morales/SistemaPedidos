@@ -17,6 +17,7 @@ class Compra extends Model
         'purchase_date',
         'status',
         'codigo',
+        'codigo_numero',
     ];
 
     public function supplier(){

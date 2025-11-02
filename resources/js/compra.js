@@ -77,6 +77,7 @@ function resetearModalCompra() {
     $status.val('').trigger('change');
     $supplier_id.val('').trigger('change');
     $tipodocumento_id.val('').trigger('change');
+    $('#codigo_numero').val('');
     totalInput.value = '';
 
     if ($.fn.DataTable.isDataTable('#detalleCompraTableEditable')) {
@@ -180,13 +181,14 @@ const table = $('#comprasTable').DataTable({
     serverSide: true,
     ajax: '/compras/data',
     columns: [
-        { data: 'id', name: 'id' },
-        { data: 'proveedor', name: 'proveedor' },
-        { data: 'tipo_documento', name: 'tipo_documento' },
-        { data: 'usuario', name: 'usuario' },
-        { data: 'fecha', name: 'fecha' },
-        { data: 'total', name: 'total' },
-        { data: 'estado', name: 'estado' },
+        { data: 'id', name: 'compras.id' },
+        { data: 'proveedor', name: 'suppliers.name' },
+        { data: 'tipo_documento', name: 'tipodocumento.name' },
+        { data: 'codigo_numero', name: 'compras.codigo_numero' },
+        { data: 'usuario', name: 'users.name' },
+        { data: 'fecha', name: 'compras.purchase_date' },
+        { data: 'total', name: 'compras.total_cost' },
+        { data: 'estado', name: 'compras.status' },
         { data: 'acciones', name: 'acciones', orderable: false, searchable: false }
     ],
     language: { url: '/assets/js/es-ES.json' },
@@ -195,7 +197,7 @@ const table = $('#comprasTable').DataTable({
     autoWidth: false,
     //lengthMenu: [10, 25, 50, 75, 100],
     pageLength: 10,
-    order: [[0, 'asc']],
+    order: [[0, 'desc']],
     dom: 'Bfrtip',
     buttons: [
         {
@@ -526,6 +528,7 @@ $(document).on('click', '.edit-btn', async function () {
         $('#compra_id').val(compra.id);
         $('#tipodocumento_id').val(compra.tipo_documento).trigger('change');
         $('#purchase_date').val(compra.fecha);
+        $('#codigo_numero').val(compra.codigo_numero ?? '');
         $('#status').val(compra.estado).trigger('change');
 
         // Llenar tabla de detalle
@@ -747,4 +750,3 @@ $('#modalDetalleCompra').on('hidden.bs.modal', function () {
     }
     document.getElementById('detalleCompraBodydos').innerHTML = '';
 });
-

@@ -38,7 +38,8 @@
                                     <tr>
                                         <th>ID</th>
                                         <th>Proveedor</th>
-                                        <th>Tipo Documento</th>
+                                        <th>Tipo Compra</th>
+                                        <th>Codido Compra</th>
                                         <th>Usuario</th>
                                         <th>Fecha</th>
                                         <th>Total</th>
@@ -81,14 +82,19 @@
                             </select>
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label for="tipodocumento_id" class="form-label">Tipo Documento</label>
+                        <div class="col-md-4 mb-3">
+                            <label for="tipodocumento_id" class="form-label">Tipo Compra</label>
                             <select class="form-select" id="tipodocumento_id" name="tipodocumento_id" required>
                                 <option value="">-- Seleccione --</option>
                                 @foreach ($tiposDocumento as $documento)
                                 <option value="{{ $documento->id }}">{{ $documento->name }}</option>
                                 @endforeach
                             </select>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="codigo_numero" class="form-label">Nro Compra</label>
+                            <input type="number" class="form-control" id="codigo_numero" name="codigo_numero" min="0" step="1">
                         </div>
 
                         <div class="col-md-4 mb-3">
@@ -194,3 +200,4 @@
 @push('scripts')
 @vite('resources/js/compra.js')
 @endpush
+

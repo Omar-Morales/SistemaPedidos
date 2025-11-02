@@ -60,11 +60,16 @@ class CompraController extends Controller
         return response()->json(['message' => 'Detalles inválidos.'], 422);
     }
 
+    if ($request->has('codigo_numero') && $request->codigo_numero === '') {
+        $request->merge(['codigo_numero' => null]);
+    }
+
     $request->validate([
         'supplier_id' => 'required|exists:suppliers,id',
         'tipodocumento_id' => 'required|exists:tipodocumento,id',
         'purchase_date' => 'required|date',
         'status' => 'nullable|in:completed,pending',
+        'codigo_numero' => 'nullable|integer|min:0',
         'details' => 'required',
         'details.*.product_id' => 'required|exists:products,id',
         'details.*.quantity' => 'required|integer|min:1',
@@ -104,6 +109,7 @@ class CompraController extends Controller
             'total_cost' => $total,
             'status' => $request->status ?? 'completed',
             'codigo' => null,
+            'codigo_numero' => $request->codigo_numero,
         ]);
 
         $codigo = 'CMP-' . str_pad($compra->id, 5, '0', STR_PAD_LEFT);
@@ -205,6 +211,7 @@ class CompraController extends Controller
         'fecha' => Carbon::parse($compra->purchase_date)->format('Y-m-d'),
         'total' => $compra->total_cost,
         'estado' => $compra->status,
+        'codigo_numero' => $compra->codigo_numero,
         'detalle' => $compra->detalles
         ],
         'proveedores' => $proveedores,
@@ -333,9 +340,19 @@ public function update(Request $request, $id)
         $originalData = $compra->toArray();
         $originalStatus = $compra->status;
 
+        if ($compra->status !== 'pending') {
+            return response()->json([
+                'message' => 'Solo las compras con estado pendiente pueden ser editadas.'
+            ], 422);
+        }
+
         $details = json_decode($request->details, true);
         if (!is_array($details) || empty($details)) {
             return response()->json(['message' => 'Detalles inválidos.'], 422);
+        }
+
+        if ($request->has('codigo_numero') && $request->codigo_numero === '') {
+            $request->merge(['codigo_numero' => null]);
         }
 
         $request->validate([
@@ -344,6 +361,7 @@ public function update(Request $request, $id)
             'purchase_date' => 'required|date',
             'codigo' => 'nullable|string|max:50|unique:compras,codigo,' . $compra->id,
             //'payment_method' => 'required|in:cash,card,transfer',
+            'codigo_numero' => 'nullable|integer|min:0',
             'status' => 'nullable|in:completed,pending',
         ]);
 
@@ -391,6 +409,7 @@ public function update(Request $request, $id)
                 'status' => $nuevoStatus,
                 ///'payment_method' => $request->payment_method,
                 'codigo' => $request->codigo ?? $compra->codigo,
+                'codigo_numero' => $request->codigo_numero,
             ]);
 
             foreach ($details as $item) {
@@ -574,12 +593,22 @@ public function update(Request $request, $id)
 
     public function getData()
     {
-        $compras = Compra::with(['supplier', 'user', 'tipodocumento'])->select('compras.*');
+        $compras = Compra::query()
+            ->select([
+                'compras.*',
+                'suppliers.name as supplier_name',
+                'tipodocumento.name as tipodocumento_name',
+                'users.name as user_name',
+            ])
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'compras.supplier_id')
+            ->leftJoin('tipodocumento', 'tipodocumento.id', '=', 'compras.tipodocumento_id')
+            ->leftJoin('users', 'users.id', '=', 'compras.user_id');
 
         return \DataTables::of($compras)
-            ->addColumn('proveedor', fn($c) => $c->supplier->name ?? '-')
-            ->addColumn('tipo_documento', fn($c) => $c->tipodocumento->name ?? '-')
-            ->addColumn('usuario', fn($c) => $c->user->name ?? '-')
+            ->addColumn('proveedor', fn($c) => $c->supplier_name ?? '-')
+            ->addColumn('tipo_documento', fn($c) => $c->tipodocumento_name ?? '-')
+            ->addColumn('codigo_numero', fn($c) => $c->codigo_numero ?? '-')
+            ->addColumn('usuario', fn($c) => $c->user_name ?? '-')
             ->addColumn('fecha', fn($c) => Carbon::parse($c->purchase_date)->format('d/m/Y'))
             ->addColumn('total', fn($c) => 'S/ ' . number_format($c->total_cost, 2))
             ->addColumn('estado', function ($c) {
@@ -590,11 +619,17 @@ public function update(Request $request, $id)
                     default => '<span class="badge bg-secondary p-2">Desconocido</span>',
                 };
             })
+            ->orderColumn('proveedor', 'supplier_name $1')
+            ->orderColumn('tipo_documento', 'tipodocumento_name $1')
+            ->orderColumn('codigo_numero', 'compras.codigo_numero $1')
+            ->orderColumn('usuario', 'user_name $1')
+            ->orderColumn('fecha', 'compras.purchase_date $1')
+            ->orderColumn('total', 'compras.total_cost $1')
             ->addColumn('acciones', function ($c) {
                 if ($c->status === 'cancelled') return '';
                 $acciones = '';
 
-                if (Auth::user()->can('administrar.compras.edit')) {
+                if ($c->status === 'pending' && Auth::user()->can('administrar.compras.edit')) {
                     $acciones .= '
                     <button type="button" class="btn btn-sm btn-outline-warning btn-icon waves-effect waves-light edit-btn"
                         data-id="' . $c->id . '" title="Editar">
