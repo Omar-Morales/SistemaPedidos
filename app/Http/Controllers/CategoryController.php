@@ -87,6 +87,17 @@ class CategoryController extends Controller
     public function destroy(string $id)
     {
         $categoria = Category::findOrFail($id);
+
+        $tieneProductosActivos = $categoria->products()
+            ->whereIn('status', ['available', 'sold'])
+            ->exists();
+
+        if ($tieneProductosActivos) {
+            return response()->json([
+                'message' => 'No puedes eliminar esta categoría porque tiene productos asociados activos.'
+            ], 422);
+        }
+
         $categoria->status = 'inactive';
         $categoria->save();
         //$categoria->delete();

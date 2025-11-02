@@ -243,7 +243,9 @@ class ProductController extends Controller
 
     public function getData(Request $request)
     {
-    $products = Product::with('category', 'images')->select('products.*')->whereIn('status', ['available', 'sold']);
+    $products = Product::with('category', 'images')
+        ->select('products.*')
+        ->whereIn('products.status', ['available', 'sold']);
 
     return DataTables::of($products)
             ->addColumn('estado', function ($product) {

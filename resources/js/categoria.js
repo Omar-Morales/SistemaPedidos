@@ -224,8 +224,9 @@ $(document).on('click', '.delete-btn', function (e) {
             })
             .catch(error => {
                 console.error(error);
+                const message = error.response?.data?.message || "Error al eliminar la categoría";
                 Toastify({
-                    text: "Error al eliminar la categoría",
+                    text: message,
                     duration: 3000,
                     gravity: "top",
                     position: "right",
