@@ -97,11 +97,6 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="address" class="form-label">Dirección</label>
-                            <textarea name="address" class="form-control" id="address"></textarea>
-                        </div>
-
-                        <div class="col-md-6">
                             <label for="photo" class="form-label">Foto</label>
                             <input type="file" class="form-control" id="photo" name="photo" accept="image/jpeg,image/png,image/jpg,image/gif">
                             <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="btnVerLogo" style="display: none;">

@@ -108,7 +108,6 @@ document.getElementById('btn-destroy-all-sessions').addEventListener('click', ()
         // Actualiza campos visibles del perfil lateral
         document.querySelector('input[placeholder="Correo"]').value = u.email;
         document.querySelector('input[placeholder="Teléfono"]').value = u.phone || '';
-        document.querySelector('input[placeholder="Dirección"]').value = u.address || '';
 
         // Actualiza progress bar desde backend
         const percent = res.data.percent ?? 0;

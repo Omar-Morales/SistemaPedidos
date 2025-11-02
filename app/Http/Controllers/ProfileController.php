@@ -42,7 +42,7 @@ class ProfileController extends Controller
     $user->save();
 
     // Misma lógica que en el provider
-    $fields = ['name', 'email', 'phone', 'address', 'photo'];
+    $fields = ['name', 'email', 'phone', 'photo'];
 
     $filled = collect($fields)->filter(function ($field) use ($user) {
         if ($field === 'photo') {
@@ -59,7 +59,6 @@ class ProfileController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'phone' => $user->phone,
-            'address' => $user->address,
             'photo' => $user->photo && Storage::disk('public')->exists($user->photo) ? $user->photo : null,
         ],
         'percent' => $percent,
@@ -111,7 +110,7 @@ class ProfileController extends Controller
         $user->save();
 
         // Cálculo del porcentaje (como en AppServiceProvider)
-        $fields = ['name', 'email', 'phone', 'address', 'photo'];
+        $fields = ['name', 'email', 'phone', 'photo'];
         $filled = collect($fields)->filter(function ($field) use ($user) {
             if ($field === 'photo') {
                 return $user->photo && Storage::disk('public')->exists($user->photo);

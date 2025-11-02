@@ -148,7 +148,6 @@ $(document).on('click', '.edit-btn', async function () {
         $('#name').val(data.name);
         $('#email').val(data.email);
         $('#phone').val(data.phone);
-        $('#address').val(data.address);
         $('#password').val('');
         $('#password_confirmation').val('');
         $('label[for="password"]').text('Nueva Contraseña');

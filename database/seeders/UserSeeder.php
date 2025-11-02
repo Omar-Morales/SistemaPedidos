@@ -23,7 +23,6 @@ class UserSeeder extends Seeder
                 'email' => strtolower($role->name) . '@example.com',
                 'password' => Hash::make('123456'),
                 'phone' => fake()->phoneNumber(),
-                'address' => fake()->address(),
                 'photo' => fake()->imageUrl(100,100,'people'),
                 //'role_id' => $role->id,
             ]);

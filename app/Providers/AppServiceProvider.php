@@ -33,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
             : asset("assets/images/users.jpg");
 
         // Incluir siempre 'photo' como campo requerido
-        $fields = ['name', 'email', 'phone', 'address', 'photo'];
+        $fields = ['name', 'email', 'phone', 'photo'];
 
         // Contar solo los campos realmente llenos
         $filled = collect($fields)->filter(function ($field) use ($user) {

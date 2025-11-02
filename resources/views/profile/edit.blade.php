@@ -67,14 +67,6 @@
     <input type="text" class="form-control" readonly placeholder="Teléfono" value="{{$user->phone }}">
   </div>
 
-  <div class="mb-3 d-flex">
-    <div class="avatar-xs d-block flex-shrink-0 me-3">
-      <span class="avatar-title rounded-circle fs-16 bg-info text-light">
-        <i class="ri-map-pin-fill"></i>
-      </span>
-    </div>
-    <input type="text" class="form-control" readonly placeholder="Dirección" value="{{$user->address }}">
-  </div>
 </div>
 
         </div>

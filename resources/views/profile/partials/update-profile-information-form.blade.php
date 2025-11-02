@@ -13,11 +13,6 @@
         <label class="form-label">Teléfono</label>
         <input type="text" class="form-control" name="phone" maxlength="9" value="{{ old('phone', $user->phone) }}">
       </div>
-      <div class="col-md-6">
-        <label class="form-label">Dirección</label>
-        <input type="text" class="form-control" name="address" value="{{ old('address', $user->address) }}">
-      </div>
-
       @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
         <div class="col-12">
           <p class="text-warning">Tu correo electrónico no está verificado.</p>
