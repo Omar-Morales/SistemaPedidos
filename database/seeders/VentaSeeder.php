@@ -2,63 +2,63 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
-
-use App\Models\Venta;
+use App\Models\Customer;
 use App\Models\DetalleVenta;
-use App\Models\Transaction;
 use App\Models\Inventory;
 use App\Models\Product;
-use App\Models\Customer;
 use App\Models\TipoDocumento;
+use App\Models\Transaction;
+use App\Models\Venta;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class VentaSeeder extends Seeder
 {
-
     public function run()
     {
         DB::transaction(function () {
-            // Obtener clientes y tipos de documento
             $customers = Customer::all();
             $tiposDocumento = TipoDocumento::where('type', 'venta')->get();
-            $products = Product::where('quantity', '>', 0)->get(); // Solo productos con stock disponible
+            $products = Product::where('quantity', '>', 0)->get();
 
             if ($customers->isEmpty() || $tiposDocumento->isEmpty() || $products->isEmpty()) {
                 $this->command->warn('No hay datos suficientes en customers, tipos_documento o products con stock para generar ventas.');
                 return;
             }
 
-            // Generar 10 ventas de prueba
             for ($i = 0; $i < 10; $i++) {
                 $customer = $customers->random();
                 $tipoDocumento = $tiposDocumento->random();
 
-                // Crear la venta
                 $venta = Venta::create([
                     'customer_id' => $customer->id,
-                    'user_id' => 1, // Ajustar según el usuario administrador o de prueba
+                    'user_id' => 1, // Ajustar segn el usuario administrador o de prueba
                     'tipodocumento_id' => $tipoDocumento->id,
-                    'total_price' => 0, // Se actualizará después de agregar detalles
-                    'sale_date' => now()->subDays(rand(1, 30)), // Fecha aleatoria en el último mes
-                    'status' => 'completed',
+                    'total_price' => 0,
+                    'amount_paid' => 0,
+                    'sale_date' => now()->subDays(rand(1, 30)),
+                    'status' => 'delivered',
+                    'payment_status' => 'pending',
+                    'difference' => 0,
+                    'payment_method' => 'cash',
+                    'delivery_type' => rand(0, 1) ? 'pickup' : 'delivery',
+                    'warehouse' => collect(['curva','milla','santa_carolina'])->random(),
                     'codigo' => 'TEMP',
                 ]);
 
                 $totalPrice = 0;
+                $detalleCount = rand(1, 5);
 
-                // Cada venta tendrá entre 1 y 5 productos vendidos
-                $detalleCount = rand(1, 15);
                 for ($j = 0; $j < $detalleCount; $j++) {
                     $product = $products->random();
-                    if ($product->quantity < 1) continue; // Evitar vender productos sin stock
+                    if ($product->quantity < 1) {
+                        continue;
+                    }
 
-                    $quantity = rand(1, min(5, $product->quantity)); // No vender más de lo que hay en stock
+                    $quantity = rand(1, min(5, $product->quantity));
                     $unitPrice = rand(10, 100);
                     $subtotal = $quantity * $unitPrice;
 
-                    // Crear detalle de venta
                     DetalleVenta::create([
                         'sale_id' => $venta->id,
                         'product_id' => $product->id,
@@ -67,38 +67,35 @@ class VentaSeeder extends Seeder
                         'subtotal' => $subtotal,
                     ]);
 
-                    // Registrar en inventario (descontando stock)
                     Inventory::create([
                         'product_id' => $product->id,
                         'reference_id' => $venta->id,
                         'type' => 'sale',
-                        'quantity' => -$quantity, // Se resta del stock
+                        'quantity' => -$quantity,
                         'reason' => 'Venta ID: ' . $venta->id,
-                        'user_id' => 1, // Ajustar según el usuario administrador o de prueba
+                        'user_id' => 1, // Ajustar segn el usuario administrador o de prueba
                     ]);
 
-                    // Actualizar stock del producto
-                    $product->quantity -= $quantity;
-                    $product->save();
-
-                    // Sumar al total de la venta
+                    $product->decrement('quantity', $quantity);
                     $totalPrice += $subtotal;
                 }
 
-                // Actualizar el total de la venta
+                $codigo = 'VTA-' . str_pad((string) $venta->id, 5, '0', STR_PAD_LEFT);
+                $venta->update([
+                    'codigo' => $codigo,
+                    'total_price' => $totalPrice,
+                    'amount_paid' => $totalPrice,
+                    'payment_status' => 'paid',
+                    'payment_status' => 'paid',
+                    'difference' => 0,
+                ]);
 
-
-                // Actualizar el total de la compra
-                $codigo = 'VTA-' . str_pad($venta->id, 5, '0', STR_PAD_LEFT);
-                $venta->update(['codigo' => $codigo, 'total_price' => $totalPrice]);
-
-                // Registrar la transacción
                 Transaction::create([
                     'type' => 'sale',
                     'amount' => $totalPrice,
                     'reference_id' => $venta->id,
-                    'description' => 'Venta ID: ' . $venta->id,
-                    'user_id' => 1, // Ajustar según el usuario administrador o de prueba
+                    'description' => 'Venta entregada ID: ' . $venta->id,
+                    'user_id' => 1, // Ajustar segn el usuario administrador o de prueba
                 ]);
             }
 
@@ -106,3 +103,4 @@ class VentaSeeder extends Seeder
         });
     }
 }
+

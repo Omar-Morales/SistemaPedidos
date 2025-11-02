@@ -6,6 +6,10 @@ const modalVenta = new bootstrap.Modal(document.getElementById('modalVenta'));
 const formVenta = document.getElementById('formVenta');
 const tablaDetalle = document.getElementById('detalleVentaBody');
 const totalInput = document.getElementById('total_price');
+const saleDateInput = document.getElementById('sale_date');
+const amountPaidInput = document.getElementById('amount_paid');
+const paymentStatusHidden = document.getElementById('payment_status');
+const paymentStatusLabel = document.getElementById('payment_status_label');
 const btnAgregarProducto = document.getElementById('addProductRow');
 let products = [];
 
@@ -29,7 +33,7 @@ function cargarProductos(callback) {
 function cargarProductos(callback, includeIds = []) {
     let url = '/products/list';
 
-    // ✅ Filtra solo IDs válidos numéricos
+    //  Filtra solo IDs vlidos numricos
     const validIds = includeIds.filter(id => id !== undefined && id !== null && !isNaN(Number(id)));
 
     if (validIds.length > 0) {
@@ -57,8 +61,17 @@ const $status = $('#status');
 const $customer_id = $('#customer_id');
 const $tipodocumento_id = $('#tipodocumento_id');
 const $payment_method = $('#payment_method');
+const $delivery_type = $('#delivery_type');
+const $warehouse = $('#warehouse');
 
-[$status, $customer_id, $tipodocumento_id, $payment_method].forEach($el => {
+const paymentStatusLabels = {
+    pending: 'Pendiente',
+    to_collect: 'Saldo pendiente',
+    change: 'Vuelto pendiente',
+    paid: 'Cancelado'
+};
+
+[$status, $customer_id, $tipodocumento_id, $payment_method, $delivery_type, $warehouse].forEach($el => {
     if (!$el.hasClass('select2-hidden-accessible')) {
         $el.select2({
             dropdownParent: $('#modalVenta'),
@@ -70,6 +83,29 @@ const $payment_method = $('#payment_method');
     }
 });
 
+function actualizarEstadoPago() {
+    if (!paymentStatusHidden) return;
+
+    const total = parseFloat(totalInput?.value) || 0;
+    const amount = parseFloat(amountPaidInput?.value) || 0;
+    let statusCode = 'pending';
+
+    if (amount <= 0) {
+        statusCode = 'pending';
+    } else if (amount < total) {
+        statusCode = 'to_collect';
+    } else if (amount > total) {
+        statusCode = 'change';
+    } else {
+        statusCode = 'paid';
+    }
+
+    paymentStatusHidden.value = statusCode;
+    if (paymentStatusLabel) {
+        paymentStatusLabel.value = paymentStatusLabels[statusCode] || statusCode;
+    }
+}
+
 
 function resetearModalVenta() {
     formVenta.reset();
@@ -78,13 +114,23 @@ function resetearModalVenta() {
     $customer_id.val('').trigger('change');
     $tipodocumento_id.val('').trigger('change');
     $payment_method.val('').trigger('change');
-    totalInput.value = '';
+    $delivery_type.val('').trigger('change');
+    $warehouse.val('').trigger('change');
+
+    if (saleDateInput) {
+        saleDateInput.value = new Date().toISOString().slice(0, 10);
+    }
+
+    if (totalInput) totalInput.value = '0.00';
+    if (amountPaidInput) amountPaidInput.value = '0.00';
+    if (paymentStatusHidden) paymentStatusHidden.value = 'pending';
+    if (paymentStatusLabel) paymentStatusLabel.value = paymentStatusLabels.pending;
 
     if ($.fn.DataTable.isDataTable('#detalleVentaTableEditable')) {
         $('#detalleVentaTableEditable').DataTable().clear().destroy();
     }
 
-    // 🔥 Eliminar select2 y eventos
+    //  Eliminar select2 y eventos
     $('#detalleVentaBody .product-select').each(function () {
         if ($(this).data('select2')) {
             $(this).select2('destroy');
@@ -92,8 +138,13 @@ function resetearModalVenta() {
         $(this).off();
     });
 
-    // 🔥 Limpiar el tbody de filas
+    //  Limpiar el tbody de filas
     tablaDetalle.innerHTML = '';
+    actualizarEstadoPago();
+}
+
+if (amountPaidInput) {
+    amountPaidInput.addEventListener('input', actualizarEstadoPago);
 }
 
 /*************************para el seelct customer - cliente*************************************/
@@ -181,8 +232,13 @@ const table = $('#ventasTable').DataTable({
         { data: 'usuario', name: 'usuario' },
         { data: 'fecha', name: 'fecha' },
         { data: 'total', name: 'total' },
-        { data: 'estado', name: 'estado' },
-        { data: 'metodopago', name: 'metodopago' },
+        { data: 'monto_pagado', name: 'amount_paid' },
+        { data: 'diferencia', name: 'diferencia' },
+        { data: 'tipo_entrega', name: 'delivery_type' },
+        { data: 'almacen', name: 'warehouse' },
+        { data: 'estado_pedido', name: 'estado_pedido' },
+        { data: 'estado_pago', name: 'estado_pago' },
+        { data: 'metodo_pago', name: 'metodo_pago' },
         { data: 'acciones', name: 'acciones', orderable: false, searchable: false }
     ],
     language: { url: '/assets/js/es-ES.json' },
@@ -210,7 +266,7 @@ const table = $('#ventasTable').DataTable({
             if (isActive) {
             // Agregar check si no existe
             if ($(this).find('.checkmark').length === 0) {
-                $(this).prepend('<span class="checkmark">✔</span>');
+                $(this).prepend('<span class="checkmark"></span>');
             }
             } else {
             // Remover check si existe
@@ -219,17 +275,17 @@ const table = $('#ventasTable').DataTable({
         });
         }
 
-        // Evento cuando se hace alguna acción con los botones (activar/desactivar columna)
+        // Evento cuando se hace alguna accin con los botones (activar/desactivar columna)
     table.on('buttons-action', function () {
     setTimeout(updateColvisStyles, 10);
     });
 
-    // Evento para cuando abren el menú de columnas visibles
+    // Evento para cuando abren el men de columnas visibles
     $(document).on('click', '.buttons-colvis', function () {
     setTimeout(updateColvisStyles, 50);
     });
 
-    // Opcional: cuando se carga la página
+    // Opcional: cuando se carga la pagina
     $(document).ready(function () {
     setTimeout(updateColvisStyles, 100);
 
@@ -243,7 +299,7 @@ const table = $('#ventasTable').DataTable({
         let $nav;
         if (windowWidth >= 1024 && $('.app-menu').is(':visible')) {
             $nav = $('.app-menu');
-            console.log('Usando menú lateral (.app-menu)');
+            console.log('Usando men lateral (.app-menu)');
         } else {
             $nav = $('#page-topbar');
             console.log('Usando header (#page-topbar)');
@@ -272,7 +328,7 @@ const table = $('#ventasTable').DataTable({
             $toggleBtn.attr('aria-expanded', 'false');
             $toggleBtn.blur();
 
-            console.log('Menú ocultado');
+            console.log('Men ocultado');
         }
     });
 
@@ -281,7 +337,7 @@ const table = $('#ventasTable').DataTable({
 function calcularTotal() {
     const table = $('#detalleVentaTableEditable').DataTable();
     let total = 0;
-    // Recorre todas las filas (incluso las ocultas en otras páginas)
+    // Recorre todas las filas (incluso las ocultas en otras paginas)
     table.rows().every(function () {
         const row = this.node();
         const input = row?.querySelector('.subtotal-input');
@@ -289,6 +345,7 @@ function calcularTotal() {
     });
 
     if (totalInput) totalInput.value = total.toFixed(2);
+    actualizarEstadoPago();
 }
 
 function validarFila(row) {
@@ -369,17 +426,17 @@ $(document).on('input', '.quantity-input, .unit-price-input', function () {
 
 $(document).on('click', '.remove-row', function () {
     const table = $('#detalleVentaTableEditable').DataTable();
-    const currentPage = table.page(); // página actual
+    const currentPage = table.page(); // pagina actual
     const currentRows = table.rows({ page: 'current' }).count(); // filas actuales visibles
 
     // Eliminar la fila
     table.row($(this).closest('tr')).remove();
 
-    // Si era la única fila visible y no estás en la página 0, retrocede
+    // Si era la unica fila visible y no estas en la pagina 0, retrocede
     if (currentRows === 1 && currentPage > 0) {
         table.page(currentPage - 1).draw('page');
     } else {
-        table.draw(false); // Redibuja manteniendo la página
+        table.draw(false); // Redibuja manteniendo la pagina
     }
 
     calcularTotal();
@@ -424,15 +481,15 @@ formVenta.addEventListener('submit', function (e) {
     });
 
     if (!valido || detalle.length === 0) {
-        Swal.fire('Error', 'Verifique que cada producto esté completo y sin duplicados.', 'error');
+        Swal.fire('Error', 'Verifique que cada producto este completo y sin duplicados.', 'error');
         return;
     }
 
     Swal.fire({
-        title: '¿Guardar venta?',
+        title: 'Guardar venta?',
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Sí, guardar',
+        confirmButtonText: 'Si, guardar',
         cancelButtonText: 'Cancelar'
     }).then((result) => {
         if (result.isConfirmed) {
@@ -478,7 +535,7 @@ $(document).on('click', '.edit-btn', async function () {
     $('#modalVenta .modal-content').append('<div id="cargandoOverlay" class="modal-loading-overlay"></div>');
 
     try {
-        // Obtener la venta y los clientes (incluso si están inactivos)
+        // Obtener la venta y los clientes (incluso si estn inactivos)
         const { data } = await axios.get(`/ventas/${id}`);
         const venta = data.venta;
         const clientes = data.clientes;
@@ -487,7 +544,7 @@ $(document).on('click', '.edit-btn', async function () {
         const productosEnVenta = (venta.detalle || []).map(item => item.product_id);
         await new Promise(resolve => cargarProductos(resolve, productosEnVenta));
 
-        // Llenar select de cliente (aunque esté inactivo)
+        // Llenar select de cliente (aunque est inactivo)
         const $clienteSelect = $('#customer_id');
         $clienteSelect.empty();
         clientes.forEach(c => {
@@ -501,8 +558,19 @@ $(document).on('click', '.edit-btn', async function () {
         $('#venta_id').val(venta.id);
         $('#tipodocumento_id').val(venta.tipo_documento).trigger('change');
         $('#sale_date').val(venta.fecha);
+        $('#delivery_type').val(venta.delivery_type).trigger('change');
+        $('#warehouse').val(venta.warehouse).trigger('change');
         $('#status').val(venta.estado).trigger('change');
         $('#payment_method').val(venta.payment_method).trigger('change');
+        $('#total_price').val(parseFloat(venta.total).toFixed(2));
+        if (amountPaidInput) amountPaidInput.value = parseFloat(venta.amount_paid).toFixed(2);
+        if (paymentStatusHidden) {
+            paymentStatusHidden.value = venta.payment_status;
+            if (paymentStatusLabel) {
+                paymentStatusLabel.value = paymentStatusLabels[venta.payment_status] || venta.payment_status;
+            }
+        }
+        actualizarEstadoPago();
 
         // Llenar tabla de detalle
         tablaDetalle.innerHTML = '';
@@ -539,13 +607,13 @@ $(document).on('click', '.delete-btn', function () {
     const id = $(this).data('id');
 
     Swal.fire({
-        title: '¿Estás seguro?',
-        text: 'No podrás revertir esta acción.',
+        title: 'estas seguro?',
+        text: 'No podrs revertir esta accin.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
         cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Sí, eliminar',
+        confirmButtonText: 'S, eliminar',
         cancelButtonText: 'Cancelar'
     }).then((result) => {
         if (result.isConfirmed) {
@@ -654,7 +722,7 @@ $(document).on('select2:select', '.product-select', function (e) {
 
     if (productoYaExiste(selectedProductId, currentRow)) {
         Toastify({
-            text: 'Este producto ya está seleccionado en otra fila.',
+            text: 'Este producto ya est seleccionado en otra fila.',
             duration: 3000,
             gravity: 'top',
             position: 'right',
