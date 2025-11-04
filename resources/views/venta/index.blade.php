@@ -35,18 +35,19 @@
                                 <thead>
                                     <tr>
                                         <th>ID</th>
-                                        <th>Cliente</th>
-                                        <th>Tipo Documento</th>
-                                        <th>Usuario</th>
                                         <th>Fecha</th>
+                                        <th>Usuario</th>
+                                        <th>Cliente</th>
+                                        <th>Producto</th>
+                                        <th>Cantidad</th>
+                                        <th>Unidad</th>
+                                        <th>Almacen</th>
                                         <th>Total</th>
                                         <th>Monto Pagado</th>
                                         <th>Diferencia</th>
-                                        <th>Tipo de Entrega</th>
-                                        <th>Almacen</th>
-                                        <th>Estado de Pedido</th>
-                                        <th>Estado de Pago</th>
                                         <th>Metodo de Pago</th>
+                                        <th>Estado de Pago</th>
+                                        <th>Estado de Pedido</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -192,6 +193,10 @@
                             <th>Cantidad</th>
                             <th>Unidad</th>
                             <th>Subtotal</th>
+                            <th>Monto Pagado</th>
+                            <th>Diferencia</th>
+                            <th>Estado Pago</th>
+                            <th>Estado Pedido</th>
                         </tr>
                     </thead>
                     <tbody id="detalleVentaBodydos"></tbody>

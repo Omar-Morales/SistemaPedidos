@@ -14,6 +14,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Yajra\DataTables\Facades\DataTables;
 
 class VentaController extends Controller
@@ -23,8 +25,8 @@ class VentaController extends Controller
         // Solo usuarios con los permisos adecuados pueden acceder a cada accion
         $this->middleware('permission:administrar.ventas.index')->only(['index', 'getData', 'detalle', 'show']);
         $this->middleware('permission:administrar.ventas.create')->only(['store']);
-        $this->middleware('permission:administrar.ventas.edit')->only(['update']);
-        $this->middleware('permission:administrar.ventas.delete')->only(['destroy']);
+        $this->middleware('permission:administrar.ventas.edit')->only(['update', 'updateDetail']);
+        $this->middleware('permission:administrar.ventas.delete')->only(['destroy', 'destroyDetail']);
     }
 
     public function index()
@@ -50,15 +52,6 @@ class VentaController extends Controller
         }
     }
 
-    private function mapStatusToLegacy(string $status): string
-    {
-        return match ($status) {
-            'delivered' => 'completed',
-            'cancelled' => 'cancelled',
-            default => 'pending',
-        };
-    }
-
     private function calculatePaymentStatus(float $total, float $amountPaid): string
     {
         if ($amountPaid <= 0) {
@@ -74,6 +67,69 @@ class VentaController extends Controller
         }
 
         return 'paid';
+    }
+
+    private function normalizeDetailStatus(?string $status): string
+    {
+        return match (strtolower($status ?? '')) {
+            'in_progress' => 'in_progress',
+            'delivered' => 'delivered',
+            'cancelled' => 'cancelled',
+            default => 'pending',
+        };
+    }
+
+    private function normalizeDetailPaymentStatus(?string $status, float $subtotal, float $amountPaid): string
+    {
+        $normalized = strtolower($status ?? '');
+
+        if ($normalized === 'paid') {
+            return 'paid';
+        }
+
+        if ($amountPaid >= $subtotal && $subtotal > 0) {
+            return 'paid';
+        }
+
+        return 'pending';
+    }
+
+    private function resolveSaleStatusFromDetails($statuses): string
+    {
+        $collection = collect($statuses)
+            ->filter(fn ($status) => !is_null($status))
+            ->map(fn ($status) => strtolower((string) $status));
+
+        if ($collection->isEmpty()) {
+            return 'pending';
+        }
+
+        if ($collection->every(fn ($status) => $status === 'cancelled')) {
+            return 'cancelled';
+        }
+
+        if ($collection->every(fn ($status) => $status === 'delivered')) {
+            return 'delivered';
+        }
+
+        if ($collection->contains('delivered') || $collection->contains('in_progress')) {
+            return 'in_progress';
+        }
+
+        return 'pending';
+    }
+
+    private function shouldAffectInventory(string $status): bool
+    {
+        return $status === 'delivered';
+    }
+
+    private function formatUnitValue($value): string
+    {
+        $numeric = is_numeric($value) ? (float) $value : 0;
+        $formatted = number_format($numeric, 2, '.', '');
+
+        return rtrim(rtrim($formatted, '0'), '.') ?: '0';
     }
 
     private function inventoryReason(string $status, int $ventaId): string
@@ -98,9 +154,9 @@ class VentaController extends Controller
 
     public function store(Request $request)
     {
-        $details = json_decode($request->input('details'), true);
+        $rawDetails = json_decode($request->input('details'), true);
 
-        if (!is_array($details) || empty($details)) {
+        if (!is_array($rawDetails) || empty($rawDetails)) {
             return response()->json(['message' => 'Detalles invalidos.'], 422);
         }
 
@@ -108,11 +164,9 @@ class VentaController extends Controller
             'customer_id' => 'required|exists:customers,id',
             'tipodocumento_id' => 'required|exists:tipodocumento,id',
             'sale_date' => 'nullable|date',
-            'payment_method' => 'required|in:cash,card,transfer',
-            'delivery_type' => 'required|in:pickup,delivery',
-            'warehouse' => 'required|in:curva,milla,santa_carolina',
-            'payment_status' => 'nullable|in:pending,paid',
-            'amount_paid' => 'nullable|numeric|min:0',
+            'payment_method' => 'nullable|in:cash,card,transfer',
+            'delivery_type' => 'nullable|in:pickup,delivery',
+            'warehouse' => 'nullable|in:curva,milla,santa_carolina',
         ]);
 
         $cliente = Customer::find($request->customer_id);
@@ -120,26 +174,61 @@ class VentaController extends Controller
             return response()->json(['message' => "El cliente '{$cliente->name}' esta inactivo."], 422);
         }
 
-        $idsProductos = collect($details)->pluck('product_id')->unique();
-        $productos = Product::whereIn('id', $idsProductos)->get()->keyBy('id');
+        $productIds = collect($rawDetails)->pluck('product_id')->unique();
+        $productos = Product::whereIn('id', $productIds)->get()->keyBy('id');
 
-        foreach ($idsProductos as $idProd) {
-            $producto = $productos->get($idProd);
-            if (!$producto) {
-                return response()->json(['message' => "El producto con ID {$idProd} no existe."], 422);
+        $detalleSanitizado = [];
+        $productosUsados = [];
+
+        foreach ($rawDetails as $index => $item) {
+            if (!isset($item['product_id']) || !is_numeric($item['product_id'])) {
+                return response()->json([
+                    'message' => "Debe seleccionar un producto valido para el item {$index}.",
+                ], 422);
             }
+
+            $productId = (int) $item['product_id'];
+            $producto = $productos->get($productId);
+
+            if (!$producto) {
+                return response()->json(['message' => "El producto con ID {$productId} no existe."], 404);
+            }
+
             if ($producto->status === 'archived') {
                 return response()->json(['message' => "El producto '{$producto->name}' esta archivado."], 422);
             }
-        }
 
-        foreach ($details as $index => $item) {
-            if (
-                !isset($item['product_id']) || !is_numeric($item['product_id']) ||
-                !isset($item['quantity']) || !is_numeric($item['quantity']) || $item['quantity'] < 1 ||
-                !isset($item['unit']) || trim($item['unit']) === '' ||
-                !isset($item['subtotal']) || !is_numeric($item['subtotal']) || $item['subtotal'] < 0
-            ) {
+            if (in_array($productId, $productosUsados, true)) {
+                return response()->json(['message' => "El producto '{$producto->name}' esta repetido."], 422);
+            }
+
+            $quantity = isset($item['quantity']) ? (int) $item['quantity'] : 0;
+            $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
+            $unitInput = $item['unit'] ?? null;
+            $amountPaid = isset($item['amount_paid']) ? max(0, (float) $item['amount_paid']) : 0;
+            $warehouseDetalle = $item['warehouse'] ?? $venta->warehouse;
+            $deliveryDetalle = $item['delivery_type'] ?? $venta->delivery_type;
+            $paymentMethodDetalle = $item['payment_method'] ?? $venta->payment_method;
+
+            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
+                return response()->json([
+                    'message' => "Almacen invalido para el item {$index}.",
+                ], 422);
+            }
+
+            if (!in_array($deliveryDetalle, ['pickup', 'delivery'], true)) {
+                return response()->json([
+                    'message' => "Tipo de entrega invalido para el item {$index}.",
+                ], 422);
+            }
+
+            if ($paymentMethodDetalle && !in_array($paymentMethodDetalle, ['cash', 'card', 'transfer'], true)) {
+                return response()->json([
+                    'message' => "Metodo de pago invalido para el item {$index}.",
+                ], 422);
+            }
+
+            if ($quantity < 1 || !is_numeric($subtotal) || $subtotal < 0) {
                 return response()->json([
                     'message' => "Detalle invalido en la posicion {$index}.",
                     'errors' => [
@@ -147,99 +236,156 @@ class VentaController extends Controller
                     ],
                 ], 422);
             }
+
+            $warehouseDetalle = $item['warehouse'] ?? $request->warehouse;
+            $deliveryDetalle = $item['delivery_type'] ?? $request->delivery_type;
+            $paymentMethodDetalle = $item['payment_method'] ?? $request->payment_method;
+
+            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
+                return response()->json([
+                    'message' => "Almacen invalido para el item {$index}.",
+                ], 422);
+            }
+
+            if (!in_array($deliveryDetalle, ['pickup', 'delivery'], true)) {
+                return response()->json([
+                    'message' => "Tipo de entrega invalido para el item {$index}.",
+                ], 422);
+            }
+
+            if ($paymentMethodDetalle && !in_array($paymentMethodDetalle, ['cash', 'card', 'transfer'], true)) {
+                return response()->json([
+                    'message' => "Metodo de pago invalido para el item {$index}.",
+                ], 422);
+            }
+
+            $warehouseDetalle = $item['warehouse'] ?? $venta->warehouse;
+            $deliveryDetalle = $item['delivery_type'] ?? $venta->delivery_type;
+            $paymentMethodDetalle = $item['payment_method'] ?? $venta->payment_method;
+
+            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
+                return response()->json([
+                    'message' => "Almacen invalido para el item {$index}.",
+                ], 422);
+            }
+
+            if (!in_array($deliveryDetalle, ['pickup', 'delivery'], true)) {
+                return response()->json([
+                    'message' => "Tipo de entrega invalido para el item {$index}.",
+                ], 422);
+            }
+
+            if ($paymentMethodDetalle && !in_array($paymentMethodDetalle, ['cash', 'card', 'transfer'], true)) {
+                return response()->json([
+                    'message' => "Metodo de pago invalido para el item {$index}.",
+                ], 422);
+            }
+
+            $statusDetalle = $this->normalizeDetailStatus($item['status'] ?? null);
+            $paymentStatusDetalle = $this->normalizeDetailPaymentStatus($item['payment_status'] ?? null, $subtotal, $amountPaid);
+            $differenceDetalle = round($subtotal - $amountPaid, 2);
+            $unitLabel = $this->formatUnitValue($unitInput);
+            $unitPrice = $quantity > 0 ? round($subtotal / $quantity, 4) : 0;
+
+            if ($this->shouldAffectInventory($statusDetalle) && $producto->quantity < $quantity) {
+                return response()->json(['message' => "Stock insuficiente para '{$producto->name}'."], 422);
+            }
+
+            $detalleSanitizado[] = [
+                'product_id' => $productId,
+                'quantity' => $quantity,
+                'unit' => $unitLabel,
+                'unit_price' => $unitPrice,
+                'subtotal' => $subtotal,
+                'status' => $statusDetalle,
+                'payment_status' => $paymentStatusDetalle,
+                'amount_paid' => $amountPaid,
+                'difference' => $differenceDetalle,
+                'warehouse' => $warehouseDetalle,
+                'delivery_type' => $deliveryDetalle,
+                'payment_method' => $paymentMethodDetalle,
+            ];
+
+            $productosUsados[] = $productId;
         }
+
+        $detalleCollection = collect($detalleSanitizado);
+        $activeDetails = $detalleCollection->where('status', '!=', 'cancelled');
+        $total = $activeDetails->sum('subtotal');
+        $totalPagado = $activeDetails->sum('amount_paid');
+        $statusVenta = $this->resolveSaleStatusFromDetails($detalleCollection->pluck('status'));
+        $paymentStatusVenta = $this->calculatePaymentStatus($total, $totalPagado);
+        $differenceVenta = round($total - $totalPagado, 2);
+        $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
 
         DB::beginTransaction();
 
         try {
-            $total = collect($details)->sum(function ($item) {
-                return isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
-            });
-
-            $status = 'pending';
-            $legacyStatus = $this->mapStatusToLegacy($status);
-            $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
-            $deliveryType = $request->input('delivery_type', 'pickup');
-            $warehouse = $request->input('warehouse', 'curva');
-            $requestedPaymentStatus = $request->input('payment_status', 'pending');
-            if (!in_array($requestedPaymentStatus, ['pending', 'paid'], true)) {
-                $requestedPaymentStatus = 'pending';
-            }
-            $amountPaid = $requestedPaymentStatus === 'paid' ? $total : 0;
-            $difference = $total - $amountPaid;
-            $paymentStatus = $requestedPaymentStatus;
-
             $venta = Venta::create([
                 'customer_id' => $request->customer_id,
                 'tipodocumento_id' => $request->tipodocumento_id,
                 'user_id' => auth()->id(),
                 'sale_date' => $saleDate,
                 'payment_method' => $request->payment_method,
-                'status' => $status,
-                'delivery_type' => $deliveryType,
-                'warehouse' => $warehouse,
+                'status' => $statusVenta,
+                'delivery_type' => $request->delivery_type,
+                'warehouse' => $request->warehouse,
                 'total_price' => $total,
-                'amount_paid' => $amountPaid,
-                'payment_status' => $paymentStatus,
-                'difference' => $difference,
+                'amount_paid' => $totalPagado,
+                'payment_status' => $paymentStatusVenta,
+                'difference' => $differenceVenta,
                 'codigo' => null,
             ]);
 
             $codigo = 'VNT-' . str_pad((string) $venta->id, 5, '0', STR_PAD_LEFT);
             $venta->update(['codigo' => $codigo]);
 
-            foreach ($details as $item) {
-                $producto = $productos->get($item['product_id']);
-
-                $quantity = (int) $item['quantity'];
-                $unitValue = isset($item['unit']) ? (float) $item['unit'] : 0;
-                $unitLabel = rtrim(rtrim(number_format($unitValue, 2, '.', ''), '0'), '.');
-                $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
-                $unitPrice = $quantity > 0 ? $subtotal / $quantity : 0;
-
-                if ($legacyStatus === 'completed' && $producto->quantity < $quantity) {
-                    throw new \RuntimeException('Stock insuficiente para: ' . $producto->name);
-                }
-
-                $total += $subtotal;
-
+            foreach ($detalleCollection as $detalle) {
                 DetalleVenta::create([
                     'sale_id' => $venta->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $quantity,
-                    'unit' => $unitLabel,
-                    'unit_price' => $unitPrice,
-                    'subtotal' => $subtotal,
+                    'product_id' => $detalle['product_id'],
+                    'quantity' => $detalle['quantity'],
+                    'unit' => $detalle['unit'],
+                    'unit_price' => $detalle['unit_price'],
+                    'subtotal' => $detalle['subtotal'],
+                    'status' => $detalle['status'],
+                    'payment_status' => $detalle['payment_status'],
+                    'amount_paid' => $detalle['amount_paid'],
+                    'difference' => $detalle['difference'],
+                    'warehouse' => $detalle['warehouse'],
+                    'delivery_type' => $detalle['delivery_type'],
+                    'payment_method' => $detalle['payment_method'],
                 ]);
 
                 Inventory::create([
-                    'product_id' => $item['product_id'],
+                    'product_id' => $detalle['product_id'],
                     'type' => 'sale',
-                    'quantity' => $legacyStatus === 'completed' ? -$quantity : 0,
-                    'reason' => $this->inventoryReason($status, $venta->id),
+                    'quantity' => $this->shouldAffectInventory($detalle['status']) ? -$detalle['quantity'] : 0,
+                    'reason' => $this->inventoryReason($detalle['status'], $venta->id),
                     'user_id' => auth()->id(),
                     'reference_id' => $venta->id,
                 ]);
 
-                if ($legacyStatus === 'completed') {
-                    $producto->decrement('quantity', $quantity);
+                if ($this->shouldAffectInventory($detalle['status'])) {
+                    $producto = $productos->get($detalle['product_id']);
+                    $producto->decrement('quantity', $detalle['quantity']);
                     $this->actualizarEstadoProducto($producto);
                 }
             }
 
-            $transactionAmount = $status === 'cancelled' ? 0 : $total;
+            $transactionAmount = $statusVenta === 'cancelled' ? 0 : $total;
 
             Transaction::create([
                 'type' => 'sale',
                 'amount' => $transactionAmount,
                 'reference_id' => $venta->id,
-                'description' => $this->transactionDescription($status, $venta->id),
+                'description' => $this->transactionDescription($statusVenta, $venta->id),
                 'user_id' => auth()->id(),
             ]);
 
             $this->logVenta($venta->id, 'created', [], [
                 'new_data' => $venta->toArray(),
-                'new_details' => $details,
+                'new_details' => $detalleCollection->toArray(),
             ]);
 
             DB::commit();
@@ -247,6 +393,7 @@ class VentaController extends Controller
             return response()->json(['message' => 'Venta registrada correctamente.']);
         } catch (\Throwable $th) {
             DB::rollBack();
+
             return response()->json([
                 'message' => 'Ocurri un problema al registrar la venta.',
                 'error' => $th->getMessage(),
@@ -301,6 +448,13 @@ class VentaController extends Controller
                         'unit' => $detalle->unit,
                         'unit_price' => $detalle->unit_price,
                         'subtotal' => $detalle->subtotal,
+                        'status' => $detalle->status,
+                        'payment_status' => $detalle->payment_status === 'paid' ? 'paid' : 'pending',
+                        'amount_paid' => $detalle->amount_paid,
+                        'difference' => $detalle->difference,
+                        'warehouse' => $detalle->warehouse,
+                        'delivery_type' => $detalle->delivery_type,
+                        'payment_method' => $detalle->payment_method,
                     ];
                 }),
             ],
@@ -317,10 +471,10 @@ class VentaController extends Controller
     {
         $venta = Venta::with('detalles')->findOrFail($id);
         $originalData = $venta->toArray();
-        $originalStatus = $venta->status;
+        $originalDetails = $venta->detalles->toArray();
 
-        $details = json_decode($request->input('details'), true);
-        if (!is_array($details) || empty($details)) {
+        $rawDetails = json_decode($request->input('details'), true);
+        if (!is_array($rawDetails) || empty($rawDetails)) {
             return response()->json(['message' => 'Detalles invalidos.'], 422);
         }
 
@@ -329,20 +483,60 @@ class VentaController extends Controller
             'tipodocumento_id' => 'required|exists:tipodocumento,id',
             'sale_date' => 'nullable|date',
             'payment_method' => 'required|in:cash,card,transfer',
-            'status' => 'nullable|in:pending,in_progress,delivered,cancelled',
             'delivery_type' => 'required|in:pickup,delivery',
             'warehouse' => 'required|in:curva,milla,santa_carolina',
-            'amount_paid' => 'nullable|numeric|min:0',
             'codigo' => 'nullable|string|max:50|unique:ventas,codigo,' . $venta->id,
         ]);
 
-        foreach ($details as $index => $item) {
-            if (
-                !isset($item['product_id']) || !is_numeric($item['product_id']) ||
-                !isset($item['quantity']) || !is_numeric($item['quantity']) || $item['quantity'] < 1 ||
-                !isset($item['unit']) || trim($item['unit']) === '' ||
-                !isset($item['subtotal']) || !is_numeric($item['subtotal']) || $item['subtotal'] < 0
-            ) {
+        $cliente = Customer::find($request->customer_id);
+        if ($cliente && $cliente->status === 'inactive') {
+            return response()->json(['message' => "El cliente '{$cliente->name}' esta inactivo."], 422);
+        }
+
+        $existingDeliveredByProduct = [];
+        foreach ($venta->detalles as $detalleAnterior) {
+            if ($this->shouldAffectInventory($detalleAnterior->status)) {
+                $existingDeliveredByProduct[$detalleAnterior->product_id] = ($existingDeliveredByProduct[$detalleAnterior->product_id] ?? 0) + $detalleAnterior->quantity;
+            }
+        }
+
+        $newProductIds = collect($rawDetails)->pluck('product_id')->unique();
+        $allProductIds = $newProductIds
+            ->merge($venta->detalles->pluck('product_id'))
+            ->unique();
+        $productos = Product::whereIn('id', $allProductIds)->get()->keyBy('id');
+
+        $detalleSanitizado = [];
+        $productosUsados = [];
+
+        foreach ($rawDetails as $index => $item) {
+            if (!isset($item['product_id']) || !is_numeric($item['product_id'])) {
+                return response()->json([
+                    'message' => "Debe seleccionar un producto valido para el item {$index}.",
+                ], 422);
+            }
+
+            $productId = (int) $item['product_id'];
+            $producto = $productos->get($productId);
+
+            if (!$producto) {
+                return response()->json(['message' => "El producto con ID {$productId} no existe."], 404);
+            }
+
+            if ($producto->status === 'archived') {
+                return response()->json(['message' => "El producto '{$producto->name}' esta archivado."], 422);
+            }
+
+            if (in_array($productId, $productosUsados, true)) {
+                return response()->json(['message' => "El producto '{$producto->name}' esta repetido."], 422);
+            }
+
+            $quantity = isset($item['quantity']) ? (int) $item['quantity'] : 0;
+            $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
+            $unitInput = $item['unit'] ?? null;
+            $amountPaid = isset($item['amount_paid']) ? max(0, (float) $item['amount_paid']) : 0;
+
+            if ($quantity < 1 || !is_numeric($subtotal) || $subtotal < 0) {
                 return response()->json([
                     'message' => "Detalle invalido en la posicion {$index}.",
                     'errors' => [
@@ -350,123 +544,442 @@ class VentaController extends Controller
                     ],
                 ], 422);
             }
-        }
 
-        $requestedPaymentStatus = $request->input('payment_status', $venta->payment_status ?? 'pending');
-        if (!in_array($requestedPaymentStatus, ['pending', 'paid'], true)) {
-            $requestedPaymentStatus = 'pending';
-        }
+            $statusDetalle = $this->normalizeDetailStatus($item['status'] ?? null);
+            $paymentStatusDetalle = $this->normalizeDetailPaymentStatus($item['payment_status'] ?? null, $subtotal, $amountPaid);
+            $differenceDetalle = round($subtotal - $amountPaid, 2);
+            $unitLabel = $this->formatUnitValue($unitInput);
+            $unitPrice = $quantity > 0 ? round($subtotal / $quantity, 4) : 0;
 
-        DB::transaction(function () use ($venta, $request, $details, $originalData, $originalStatus, $requestedPaymentStatus) {
-            $status = $request->input('status') ?? 'pending';
-            $legacyStatus = $this->mapStatusToLegacy($status);
-            $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
-            $deliveryType = $request->input('delivery_type', 'pickup');
-            $warehouse = $request->input('warehouse', 'curva');
-
-            $productIds = collect($details)->pluck('product_id')->unique();
-            $productos = Product::whereIn('id', $productIds)->get()->keyBy('id');
-
-            foreach ($productIds as $productId) {
-                $producto = $productos->get($productId);
-                if (!$producto) {
-                    throw new \RuntimeException("El producto con ID {$productId} no existe.");
-                }
-                if ($producto->status === 'archived') {
-                    throw new \RuntimeException("El producto '{$producto->name}' esta archivado.");
-                }
+            $availableStock = ($producto->quantity ?? 0) + ($existingDeliveredByProduct[$productId] ?? 0);
+            if ($this->shouldAffectInventory($statusDetalle) && $availableStock < $quantity) {
+                return response()->json(['message' => "Stock insuficiente para '{$producto->name}'."], 422);
             }
 
-            // Revertir stock si la venta original estaba entregada
-            if ($originalStatus === 'delivered') {
-                foreach ($venta->detalles as $detalle) {
-                    $producto = $productos->get($detalle->product_id) ?? Product::find($detalle->product_id);
+            $detalleSanitizado[] = [
+                'product_id' => $productId,
+                'quantity' => $quantity,
+                'unit' => $unitLabel,
+                'unit_price' => $unitPrice,
+                'subtotal' => $subtotal,
+                'status' => $statusDetalle,
+                'payment_status' => $paymentStatusDetalle,
+                'amount_paid' => $amountPaid,
+                'difference' => $differenceDetalle,
+                'warehouse' => $warehouseDetalle,
+                'delivery_type' => $deliveryDetalle,
+                'payment_method' => $paymentMethodDetalle,
+            ];
+
+            $productosUsados[] = $productId;
+        }
+
+        $detalleCollection = collect($detalleSanitizado);
+        $total = $detalleCollection->sum('subtotal');
+        $totalPagado = $detalleCollection->sum('amount_paid');
+        $statusVenta = $this->resolveSaleStatusFromDetails($detalleCollection->pluck('status'));
+        $paymentStatusVenta = $this->calculatePaymentStatus($total, $totalPagado);
+        $differenceVenta = round($total - $totalPagado, 2);
+        $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
+
+        DB::transaction(function () use (
+            $venta,
+            $request,
+            $detalleCollection,
+            $statusVenta,
+            $paymentStatusVenta,
+            $total,
+            $totalPagado,
+            $differenceVenta,
+            $productos,
+            $originalData,
+            $originalDetails,
+            $saleDate
+        ) {
+            foreach ($venta->detalles as $detalleAnterior) {
+                if ($this->shouldAffectInventory($detalleAnterior->status)) {
+                    $producto = $productos->get($detalleAnterior->product_id) ?? Product::find($detalleAnterior->product_id);
                     if ($producto) {
-                        $producto->increment('quantity', $detalle->quantity);
+                        $producto->increment('quantity', $detalleAnterior->quantity);
                         $this->actualizarEstadoProducto($producto);
                     }
                 }
             }
 
-            // Limpiar detalles e inventario anteriores
             DetalleVenta::where('sale_id', $venta->id)->delete();
             Inventory::where('reference_id', $venta->id)->delete();
 
-            $total = 0;
-
-            foreach ($details as $item) {
-                $producto = $productos->get($item['product_id']);
-
-                $quantity = (int) $item['quantity'];
-                $unitValue = isset($item['unit']) ? (float) $item['unit'] : 0;
-                $unitLabel = rtrim(rtrim(number_format($unitValue, 2, '.', ''), '0'), '.');
-                $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
-                $unitPrice = $quantity > 0 ? $subtotal / $quantity : 0;
-                $total += $subtotal;
-
-                if ($legacyStatus === 'completed' && $producto->quantity < $quantity) {
-                    throw new \RuntimeException('Stock insuficiente para: ' . $producto->name);
-                }
-
+            foreach ($detalleCollection as $detalle) {
                 DetalleVenta::create([
                     'sale_id' => $venta->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $quantity,
-                    'unit' => $unitLabel,
-                    'unit_price' => $unitPrice,
-                    'subtotal' => $subtotal,
+                    'product_id' => $detalle['product_id'],
+                    'quantity' => $detalle['quantity'],
+                    'unit' => $detalle['unit'],
+                    'unit_price' => $detalle['unit_price'],
+                    'subtotal' => $detalle['subtotal'],
+                    'status' => $detalle['status'],
+                    'payment_status' => $detalle['payment_status'],
+                    'amount_paid' => $detalle['amount_paid'],
+                    'difference' => $detalle['difference'],
+                    'warehouse' => $detalle['warehouse'],
+                    'delivery_type' => $detalle['delivery_type'],
+                    'payment_method' => $detalle['payment_method'],
                 ]);
 
                 Inventory::create([
-                    'product_id' => $item['product_id'],
+                    'product_id' => $detalle['product_id'],
                     'type' => 'sale',
-                    'quantity' => $legacyStatus === 'completed' ? -$quantity : 0,
-                    'reason' => $this->inventoryReason($status, $venta->id),
+                    'quantity' => $this->shouldAffectInventory($detalle['status']) ? -$detalle['quantity'] : 0,
+                    'reason' => $this->inventoryReason($detalle['status'], $venta->id),
                     'reference_id' => $venta->id,
                     'user_id' => auth()->id(),
                 ]);
 
-                if ($legacyStatus === 'completed') {
-                    $producto->decrement('quantity', $quantity);
-                    $this->actualizarEstadoProducto($producto);
+                if ($this->shouldAffectInventory($detalle['status'])) {
+                    $producto = $productos->get($detalle['product_id']);
+                    if ($producto) {
+                        $producto->decrement('quantity', $detalle['quantity']);
+                        $this->actualizarEstadoProducto($producto);
+                    }
                 }
             }
-
-            $amountPaid = $requestedPaymentStatus === 'paid' ? $total : 0;
-            $difference = $total - $amountPaid;
-            $paymentStatus = $requestedPaymentStatus;
 
             $venta->update([
                 'customer_id' => $request->customer_id,
                 'tipodocumento_id' => $request->tipodocumento_id,
                 'sale_date' => $saleDate,
-                'status' => $status,
-                'payment_method' => $request->payment_method,
-                'delivery_type' => $deliveryType,
-                'warehouse' => $warehouse,
+                'status' => $statusVenta,
+                'payment_method' => $request->input('payment_method', $venta->payment_method),
+                'delivery_type' => $request->input('delivery_type', $venta->delivery_type),
+                'warehouse' => $request->input('warehouse', $venta->warehouse),
                 'total_price' => $total,
-                'amount_paid' => $amountPaid,
-                'payment_status' => $paymentStatus,
-                'difference' => $difference,
+                'amount_paid' => $totalPagado,
+                'payment_status' => $paymentStatusVenta,
+                'difference' => $differenceVenta,
                 'codigo' => $request->input('codigo') ?? $venta->codigo,
             ]);
 
             Transaction::where('reference_id', $venta->id)
                 ->where('type', 'sale')
                 ->update([
-                    'amount' => $status === 'cancelled' ? 0 : $total,
-                    'description' => $this->transactionDescription($status, $venta->id),
+                    'amount' => $statusVenta === 'cancelled' ? 0 : $total,
+                    'description' => $this->transactionDescription($statusVenta, $venta->id),
                 ]);
+
+            $venta->refresh()->load('detalles');
 
             $this->logVenta($venta->id, 'updated', [
                 'old_data' => $originalData,
+                'old_details' => $originalDetails,
             ], [
                 'new_data' => $venta->toArray(),
-                'new_details' => $details,
+                'new_details' => $detalleCollection->toArray(),
             ]);
         });
 
         return response()->json(['message' => 'Venta actualizada correctamente.']);
+    }
+
+    public function updateDetail(Request $request, $detailId)
+    {
+        $detalle = DetalleVenta::with(['venta.detalles', 'producto'])->findOrFail($detailId);
+        $venta = $detalle->venta;
+
+        $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'tipodocumento_id' => 'required|exists:tipodocumento,id',
+            'sale_date' => 'nullable|date',
+            'payment_method' => 'nullable|in:cash,card,transfer',
+            'delivery_type' => 'nullable|in:pickup,delivery',
+            'warehouse' => 'nullable|in:curva,milla,santa_carolina',
+        ]);
+
+        $detailInput = $request->input('detail');
+
+        if (!is_array($detailInput)) {
+            return response()->json([
+                'message' => 'La informacion del detalle es invalida.',
+            ], 422);
+        }
+
+        Validator::make($detailInput, [
+            'product_id' => 'required|exists:products,id',
+            'quantity' => 'required|numeric|min:1',
+            'unit' => 'nullable|string|max:255',
+            'subtotal' => 'required|numeric|min:0',
+            'amount_paid' => 'nullable|numeric|min:0',
+            'payment_status' => 'nullable|in:pending,paid,to_collect,change',
+            'status' => 'nullable|in:pending,in_progress,delivered,cancelled',
+            'difference' => 'nullable|numeric',
+            'warehouse' => 'nullable|in:curva,milla,santa_carolina',
+            'delivery_type' => 'nullable|in:pickup,delivery',
+            'payment_method' => 'nullable|in:cash,card,transfer',
+        ])->validate();
+
+        $productId = (int) $detailInput['product_id'];
+        $quantity = (int) $detailInput['quantity'];
+        $unitLabel = $this->formatUnitValue($detailInput['unit'] ?? $detalle->unit);
+        $subtotal = round((float) $detailInput['subtotal'], 2);
+        $rawAmountPaid = isset($detailInput['amount_paid']) ? max(0, (float) $detailInput['amount_paid']) : 0.0;
+        $normalizedStatus = $this->normalizeDetailStatus($detailInput['status'] ?? $detalle->status);
+        $normalizedPaymentStatus = $this->normalizeDetailPaymentStatus($detailInput['payment_status'] ?? $detalle->payment_status, $subtotal, $rawAmountPaid);
+        $amountPaid = $normalizedPaymentStatus === 'paid' ? $subtotal : round($rawAmountPaid, 2);
+        $difference = round($subtotal - $amountPaid, 2);
+        $unitPrice = $quantity > 0 ? round($subtotal / $quantity, 4) : 0;
+        $warehouseDetalle = $detailInput['warehouse'] ?? $detalle->warehouse ?? $venta->warehouse;
+        $deliveryDetalle = $detailInput['delivery_type'] ?? $detalle->delivery_type ?? $venta->delivery_type;
+        $paymentMethodDetalle = $detailInput['payment_method'] ?? $detalle->payment_method ?? $venta->payment_method;
+
+        if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
+            return response()->json(['message' => 'Almacen invalido para el detalle.'], 422);
+        }
+
+        if (!in_array($deliveryDetalle, ['pickup', 'delivery'], true)) {
+            return response()->json(['message' => 'Tipo de entrega invalido para el detalle.'], 422);
+        }
+
+        if ($paymentMethodDetalle && !in_array($paymentMethodDetalle, ['cash', 'card', 'transfer'], true)) {
+            return response()->json(['message' => 'Metodo de pago invalido para el detalle.'], 422);
+        }
+
+        $productoNuevo = Product::findOrFail($productId);
+        if ($productoNuevo->status === 'archived') {
+            return response()->json(['message' => "El producto '{$productoNuevo->name}' esta archivado."], 422);
+        }
+
+        $oldDetailData = [
+            'product_id' => $detalle->product_id,
+            'quantity' => $detalle->quantity,
+            'unit' => $detalle->unit,
+            'subtotal' => $detalle->subtotal,
+            'status' => $detalle->status,
+            'payment_status' => $detalle->payment_status,
+            'amount_paid' => $detalle->amount_paid,
+            'difference' => $detalle->difference,
+            'warehouse' => $detalle->warehouse,
+            'delivery_type' => $detalle->delivery_type,
+            'payment_method' => $detalle->payment_method,
+        ];
+
+        try {
+            DB::transaction(function () use (
+                $detalle,
+                $venta,
+                $request,
+                $productoNuevo,
+                $productId,
+                $quantity,
+                $unitLabel,
+                $unitPrice,
+                $subtotal,
+                $amountPaid,
+                $difference,
+                $normalizedStatus,
+                $normalizedPaymentStatus,
+                $warehouseDetalle,
+                $deliveryDetalle,
+                $paymentMethodDetalle,
+                $oldDetailData
+            ) {
+                $oldStatus = $detalle->status;
+                $oldProductId = $detalle->product_id;
+                $oldQuantity = $detalle->quantity;
+
+                if ($this->shouldAffectInventory($oldStatus)) {
+                    Inventory::create([
+                        'product_id' => $oldProductId,
+                        'type' => 'adjustment_sale',
+                        'quantity' => $oldQuantity,
+                        'reason' => 'Ajuste por edicion de detalle de venta ID: ' . $venta->id,
+                        'reference_id' => $venta->id,
+                        'user_id' => auth()->id(),
+                    ]);
+
+                    $productoAnterior = Product::find($oldProductId);
+                    if ($productoAnterior) {
+                        $productoAnterior->increment('quantity', $oldQuantity);
+                        $this->actualizarEstadoProducto($productoAnterior);
+                    }
+                }
+
+                if ($this->shouldAffectInventory($normalizedStatus)) {
+                    $productoNuevo->refresh();
+                    if ($productoNuevo->quantity < $quantity) {
+                        throw ValidationException::withMessages([
+                            'detail.quantity' => "Stock insuficiente para '{$productoNuevo->name}'.",
+                        ]);
+                    }
+                }
+
+                $detalle->update([
+                    'product_id' => $productId,
+                    'quantity' => $quantity,
+                    'unit' => $unitLabel,
+                    'unit_price' => $unitPrice,
+                    'subtotal' => $subtotal,
+                    'status' => $normalizedStatus,
+                    'payment_status' => $normalizedPaymentStatus,
+                    'amount_paid' => $amountPaid,
+                    'difference' => $difference,
+                    'warehouse' => $warehouseDetalle,
+                    'delivery_type' => $deliveryDetalle,
+                    'payment_method' => $paymentMethodDetalle,
+                ]);
+
+                if ($this->shouldAffectInventory($normalizedStatus)) {
+                    Inventory::create([
+                        'product_id' => $productId,
+                        'type' => 'adjustment_sale',
+                        'quantity' => -$quantity,
+                        'reason' => 'Actualizacion de detalle de venta ID: ' . $venta->id,
+                        'reference_id' => $venta->id,
+                        'user_id' => auth()->id(),
+                    ]);
+
+                    $productoNuevo->decrement('quantity', $quantity);
+                    $this->actualizarEstadoProducto($productoNuevo);
+                }
+
+                $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
+
+                $venta->update([
+                    'customer_id' => $request->input('customer_id'),
+                    'tipodocumento_id' => $request->input('tipodocumento_id'),
+                    'sale_date' => $saleDate,
+                    'payment_method' => $request->input('payment_method', $venta->payment_method),
+                    'delivery_type' => $request->input('delivery_type', $venta->delivery_type),
+                    'warehouse' => $request->input('warehouse', $venta->warehouse),
+                ]);
+
+                $venta->load('detalles');
+
+                $activeDetails = $venta->detalles->where('status', '!=', 'cancelled');
+                $total = $activeDetails->sum('subtotal');
+                $amountTotal = $activeDetails->sum('amount_paid');
+
+                $venta->total_price = $total;
+                $venta->amount_paid = $amountTotal;
+                $venta->difference = round($total - $amountTotal, 2);
+                $venta->status = $this->resolveSaleStatusFromDetails($venta->detalles->pluck('status'));
+                $venta->payment_status = $this->calculatePaymentStatus($total, $amountTotal);
+                $venta->save();
+
+                $transactionAmount = $venta->status === 'cancelled' ? 0 : $venta->total_price;
+
+                Transaction::where('reference_id', $venta->id)
+                    ->where('type', 'sale')
+                    ->update([
+                        'amount' => $transactionAmount,
+                        'description' => $this->transactionDescription($venta->status, $venta->id),
+                    ]);
+
+                $detalle->refresh();
+
+                $this->logVenta($venta->id, 'detail_updated', [
+                    'old_detail' => $oldDetailData,
+                ], [
+                    'new_detail' => [
+                        'product_id' => $detalle->product_id,
+                        'quantity' => $detalle->quantity,
+                        'unit' => $detalle->unit,
+                        'subtotal' => $detalle->subtotal,
+                        'status' => $detalle->status,
+                        'payment_status' => $detalle->payment_status,
+                        'amount_paid' => $detalle->amount_paid,
+                        'difference' => $detalle->difference,
+                        'warehouse' => $detalle->warehouse,
+                        'delivery_type' => $detalle->delivery_type,
+                        'payment_method' => $detalle->payment_method,
+                    ],
+                ]);
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'Ocurrio un problema al actualizar el detalle.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+
+        return response()->json(['message' => 'Detalle actualizado correctamente.']);
+    }
+
+    public function destroyDetail($detailId)
+    {
+        $detalle = DetalleVenta::with(['venta.detalles', 'producto'])->findOrFail($detailId);
+        $venta = $detalle->venta;
+
+        $oldDetailData = $detalle->toArray();
+
+        DB::transaction(function () use ($detalle, $venta, $oldDetailData) {
+            $producto = $detalle->producto ?? Product::find($detalle->product_id);
+
+            if ($this->shouldAffectInventory($detalle->status) && $producto) {
+                $producto->increment('quantity', $detalle->quantity);
+                $this->actualizarEstadoProducto($producto);
+            }
+
+            Inventory::create([
+                'product_id' => $detalle->product_id,
+                'type' => 'adjustment_sale',
+                'quantity' => $this->shouldAffectInventory($detalle->status) ? $detalle->quantity : 0,
+                'reason' => 'Eliminacion de detalle de venta ID: ' . $venta->id,
+                'reference_id' => $venta->id,
+                'user_id' => auth()->id(),
+            ]);
+
+            $detalle->update([
+                'status' => 'cancelled',
+                'payment_status' => 'pending',
+                'amount_paid' => 0,
+                'difference' => $detalle->subtotal,
+            ]);
+
+            $venta->refresh()->load('detalles');
+
+            $activeDetails = $venta->detalles->where('status', '!=', 'cancelled');
+
+            if ($activeDetails->isEmpty()) {
+                $venta->update([
+                    'total_price' => 0,
+                    'amount_paid' => 0,
+                    'difference' => 0,
+                    'status' => 'cancelled',
+                    'payment_status' => 'pending',
+                ]);
+            } else {
+                $total = $activeDetails->sum('subtotal');
+                $amountTotal = $activeDetails->sum('amount_paid');
+
+                $venta->update([
+                    'total_price' => $total,
+                    'amount_paid' => $amountTotal,
+                    'difference' => round($total - $amountTotal, 2),
+                    'status' => $this->resolveSaleStatusFromDetails($venta->detalles->pluck('status')),
+                    'payment_status' => $this->calculatePaymentStatus($total, $amountTotal),
+                ]);
+            }
+
+            $transactionAmount = $venta->status === 'cancelled' ? 0 : $venta->total_price;
+
+            Transaction::where('reference_id', $venta->id)
+                ->where('type', 'sale')
+                ->update([
+                    'amount' => $transactionAmount,
+                    'description' => $this->transactionDescription($venta->status, $venta->id),
+                ]);
+
+            $this->logVenta($venta->id, 'detail_deleted', [
+                'deleted_detail' => $oldDetailData,
+            ], [
+                'updated_detail' => $detalle->toArray(),
+                'remaining_details' => $venta->detalles->toArray(),
+                'venta' => $venta->toArray(),
+            ]);
+        });
+
+        return response()->json(['message' => 'Producto eliminado de la venta.']);
     }
 
     public function destroy($id)
@@ -477,25 +990,33 @@ class VentaController extends Controller
             return response()->json(['message' => 'Esta venta ya fue anulada.'], 400);
         }
 
-        DB::transaction(function () use ($venta) {
-            if ($venta->status === 'delivered') {
-                foreach ($venta->detalles as $detalle) {
-                    $producto = $detalle->producto;
+        $ventaOriginal = $venta->toArray();
+        $detallesOriginal = $venta->detalles->map->toArray();
+
+        DB::transaction(function () use ($venta, $ventaOriginal, $detallesOriginal) {
+            foreach ($venta->detalles as $detalle) {
+                if ($this->shouldAffectInventory($detalle->status)) {
+                    $producto = $detalle->producto ?? Product::find($detalle->product_id);
                     if ($producto) {
                         $producto->increment('quantity', $detalle->quantity);
                         $this->actualizarEstadoProducto($producto);
                     }
                 }
-            }
 
-            foreach ($venta->detalles as $detalle) {
                 Inventory::create([
                     'product_id' => $detalle->product_id,
                     'type' => 'adjustment_sale',
-                    'quantity' => $venta->status === 'delivered' ? $detalle->quantity : 0,
+                    'quantity' => $this->shouldAffectInventory($detalle->status) ? $detalle->quantity : 0,
                     'reason' => 'Anulacin de venta ID: ' . $venta->id . ' (estado: ' . $venta->status . ')',
                     'reference_id' => $venta->id,
                     'user_id' => auth()->id(),
+                ]);
+
+                $detalle->update([
+                    'status' => 'cancelled',
+                    'payment_status' => 'pending',
+                    'amount_paid' => 0,
+                    'difference' => $detalle->subtotal,
                 ]);
             }
 
@@ -513,9 +1034,14 @@ class VentaController extends Controller
                     'amount' => 0,
                 ]);
 
+            $venta->refresh()->load('detalles');
+
             $this->logVenta($venta->id, 'cancelled', [
-                'old_data' => $venta->toArray(),
-                'old_details' => $venta->detalles->toArray(),
+                'old_data' => $ventaOriginal,
+                'old_details' => $detallesOriginal,
+            ], [
+                'new_data' => $venta->toArray(),
+                'new_details' => $venta->detalles->map->toArray(),
             ]);
         });
 
@@ -524,53 +1050,87 @@ class VentaController extends Controller
 
     public function getData()
     {
-        $ventas = Venta::with(['customer', 'user', 'tipodocumento'])->select('ventas.*');
+        $detalles = DetalleVenta::query()
+            ->select([
+                'detalle_ventas.id as detalle_id',
+                'detalle_ventas.sale_id',
+                'detalle_ventas.product_id',
+                'detalle_ventas.quantity',
+                'detalle_ventas.unit',
+                'detalle_ventas.subtotal',
+                'detalle_ventas.amount_paid',
+                'detalle_ventas.difference',
+                'detalle_ventas.payment_status as detalle_payment_status',
+                'detalle_ventas.status as detalle_status',
+                'detalle_ventas.warehouse as detalle_warehouse',
+                'detalle_ventas.delivery_type as detalle_delivery_type',
+                'detalle_ventas.payment_method as detalle_payment_method',
+                'ventas.sale_date',
+                'ventas.payment_method',
+                'ventas.status as venta_status',
+                'ventas.warehouse',
+                'customers.name as customer_name',
+                'users.name as user_name',
+                'products.name as product_name',
+                'products.status as product_status',
+            ])
+            ->join('ventas', 'ventas.id', '=', 'detalle_ventas.sale_id')
+            ->leftJoin('customers', 'customers.id', '=', 'ventas.customer_id')
+            ->leftJoin('users', 'users.id', '=', 'ventas.user_id')
+            ->leftJoin('products', 'products.id', '=', 'detalle_ventas.product_id');
 
         $currentUser = Auth::user();
 
-        return DataTables::of($ventas)
-            ->addColumn('cliente', fn ($v) => $v->customer->name ?? '-')
-            ->addColumn('tipo_documento', fn ($v) => $v->tipodocumento->name ?? '-')
-            ->addColumn('usuario', fn ($v) => $v->user->name ?? '-')
-            ->addColumn('fecha', fn ($v) => Carbon::parse($v->sale_date)->format('d/m/Y'))
-            ->addColumn('total', fn ($v) => 'S/ ' . number_format($v->total_price, 2))
-            ->addColumn('monto_pagado', fn ($v) => 'S/ ' . number_format($v->amount_paid, 2))
-            ->addColumn('diferencia', function ($v) {
-                $difference = (float) ($v->difference ?? ($v->total_price - $v->amount_paid));
-
+        return DataTables::of($detalles)
+            ->addColumn('id', fn ($detalle) => $detalle->sale_id)
+            ->addColumn('fecha', fn ($detalle) => Carbon::parse($detalle->sale_date)->format('d/m/Y'))
+            ->addColumn('usuario', fn ($detalle) => $detalle->user_name ?? '-')
+            ->addColumn('cliente', fn ($detalle) => $detalle->customer_name ?? '-')
+            ->addColumn('producto', function ($detalle) {
+                $nombre = $detalle->product_name ?? 'Sin nombre';
+                if (($detalle->product_status ?? null) === 'archived') {
+                    $nombre .= ' (archivado)';
+                }
+                return $nombre;
+            })
+            ->addColumn('cantidad', fn ($detalle) => $detalle->quantity)
+            ->addColumn('unidad', fn ($detalle) => $detalle->unit)
+            ->addColumn('almacen', function ($detalle) {
+                return match ($detalle->detalle_warehouse) {
+                    'milla' => 'Milla',
+                    'santa_carolina' => 'Santa Carolina',
+                    default => 'Curva',
+                };
+            })
+            ->addColumn('total', fn ($detalle) => 'S/ ' . number_format($detalle->subtotal, 2))
+            ->addColumn('monto_pagado', fn ($detalle) => 'S/ ' . number_format($detalle->amount_paid, 2))
+            ->addColumn('diferencia', function ($detalle) {
+                $difference = (float) $detalle->difference;
                 if ($difference < 0) {
                     return '<span class="text-danger">-S/ ' . number_format(abs($difference), 2) . '</span>';
                 }
 
                 return 'S/ ' . number_format($difference, 2);
             })
-            ->addColumn('tipo_entrega', fn ($v) => $v->delivery_type === 'delivery' ? 'Enviar' : 'Recoge')
-            ->addColumn('almacen', function ($v) {
-                return match ($v->warehouse) {
-                    'milla' => 'Milla',
-                    'santa_carolina' => 'Santa Carolina',
-                    default => 'Curva',
-                };
-            })
-            ->addColumn('estado_pedido', function ($v) {
-                return match ($v->status) {
-                    'delivered' => '<span class="badge bg-success p-2">Entregado</span>',
-                    'in_progress' => '<span class="badge bg-primary p-2">En curso</span>',
-                    'cancelled' => '<span class="badge bg-danger p-2">Anulado</span>',
-                    default => '<span class="badge bg-warning text-dark p-2">Pendiente</span>',
-                };
-            })
-            ->addColumn('estado_pago', function ($v) {
-                return match ($v->payment_status) {
+            ->addColumn('metodo_pago', fn ($detalle) => $detalle->detalle_payment_method ?? '-')
+            ->addColumn('estado_pago', function ($detalle) {
+                return match ($detalle->detalle_payment_status) {
                     'paid' => '<span class="badge bg-success p-2">Cancelado</span>',
                     'to_collect' => '<span class="badge bg-info text-dark p-2">Saldo pendiente</span>',
                     'change' => '<span class="badge bg-secondary p-2">Vuelto pendiente</span>',
                     default => '<span class="badge bg-warning text-dark p-2">Pendiente</span>',
                 };
             })
-            ->addColumn('metodo_pago', fn ($v) => $v->payment_method ?? '-')
-            ->addColumn('acciones', function ($v) use ($currentUser) {
-                if ($v->status === 'cancelled') {
+            ->addColumn('estado_pedido', function ($detalle) {
+                return match ($detalle->detalle_status) {
+                    'delivered' => '<span class="badge bg-success p-2">Entregado</span>',
+                    'in_progress' => '<span class="badge bg-primary p-2">En curso</span>',
+                    'cancelled' => '<span class="badge bg-danger p-2">Anulado</span>',
+                    default => '<span class="badge bg-warning text-dark p-2">Pendiente</span>',
+                };
+            })
+            ->addColumn('acciones', function ($detalle) use ($currentUser) {
+                if ($detalle->venta_status === 'cancelled') {
                     return '';
                 }
 
@@ -579,7 +1139,7 @@ class VentaController extends Controller
                 if ($currentUser && $currentUser->can('administrar.ventas.edit')) {
                     $acciones .= '
                         <button type="button" class="btn btn-sm btn-outline-warning btn-icon waves-effect waves-light edit-btn"
-                            data-id="' . $v->id . '" title="Editar">
+                            data-id="' . $detalle->sale_id . '" data-detail-id="' . $detalle->detalle_id . '" title="Editar">
                             <i class="ri-edit-2-line"></i>
                         </button>';
                 }
@@ -587,14 +1147,14 @@ class VentaController extends Controller
                 if ($currentUser && $currentUser->can('administrar.ventas.delete')) {
                     $acciones .= '
                         <button type="button" class="btn btn-sm btn-outline-danger btn-icon waves-effect waves-light delete-btn"
-                            data-id="' . $v->id . '" title="Eliminar">
+                            data-id="' . $detalle->sale_id . '" data-detail-id="' . $detalle->detalle_id . '" title="Eliminar">
                             <i class="ri-delete-bin-5-line"></i>
                         </button>';
                 }
 
                 $acciones .= '
                     <button type="button" class="btn btn-sm btn-outline-info btn-icon waves-effect waves-light ver-detalle-btn"
-                        data-id="' . $v->id . '" title="Ver detalle">
+                        data-id="' . $detalle->sale_id . '" title="Ver detalle">
                         <i class="ri-eye-line"></i>
                     </button>';
 
@@ -621,6 +1181,13 @@ class VentaController extends Controller
                 'unit' => $item->unit,
                 'unit_price' => $item->unit_price,
                 'subtotal' => $item->subtotal,
+                'amount_paid' => $item->amount_paid,
+                'difference' => $item->difference,
+                'status' => $item->status,
+                'payment_status' => $item->payment_status === 'paid' ? 'paid' : 'pending',
+                'warehouse' => $item->warehouse,
+                'delivery_type' => $item->delivery_type,
+                'payment_method' => $item->payment_method,
             ];
         });
 

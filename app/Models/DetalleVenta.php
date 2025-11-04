@@ -16,6 +16,13 @@ class DetalleVenta extends Model
         'unit',
         'unit_price',
         'subtotal',
+        'status',
+        'payment_status',
+        'amount_paid',
+        'difference',
+        'warehouse',
+        'delivery_type',
+        'payment_method',
     ];
 
     public function venta(){

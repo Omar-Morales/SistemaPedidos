@@ -63,9 +63,16 @@ class VentaSeeder extends Seeder
                     'sale_id' => $venta->id,
                     'product_id' => $product->id,
                     'quantity' => $quantity,
-                    'unit' => 'unidad',
+                    'unit' => '1',
                     'unit_price' => $unitPrice,
                     'subtotal' => $subtotal,
+                    'status' => 'delivered',
+                    'payment_status' => 'paid',
+                    'amount_paid' => $subtotal,
+                    'difference' => 0,
+                    'warehouse' => $venta->warehouse,
+                    'delivery_type' => $venta->delivery_type,
+                    'payment_method' => $venta->payment_method,
                 ]);
 
                     Inventory::create([
@@ -86,7 +93,6 @@ class VentaSeeder extends Seeder
                     'codigo' => $codigo,
                     'total_price' => $totalPrice,
                     'amount_paid' => $totalPrice,
-                    'payment_status' => 'paid',
                     'payment_status' => 'paid',
                     'difference' => 0,
                 ]);

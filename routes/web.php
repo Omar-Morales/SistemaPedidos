@@ -69,6 +69,8 @@ Route::middleware(['auth', 'active'])->group(function () {
     //Route::get('compras/pdf/{id}', [CompraController::class, 'downloadPDF'])->name('compras.pdf');
 
     Route::get('/ventas/data', [VentaController::class, 'getData'])->name('ventas.data');
+    Route::put('/ventas/detalles/{detalle}', [VentaController::class, 'updateDetail'])->name('ventas.detalles.update');
+    Route::delete('/ventas/detalles/{detalle}', [VentaController::class, 'destroyDetail'])->name('ventas.detalles.destroy');
     Route::resource('ventas', VentaController::class);
     Route::get('/ventas/{id}/detalle', [VentaController::class, 'detalle'])->name('ventas.detalle');
     //Route::get('ventas/pdf/{id}', [VentaController::class, 'downloadPDF'])->name('ventas.pdf');
