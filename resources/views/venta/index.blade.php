@@ -128,28 +128,24 @@
                                 <option value="delivery">Enviar</option>
                             </select>
                         </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label for="status" class="form-label">Estado de Pedido</label>
-                            <select class="form-select" id="status" name="status" required>
-                                <option value="">-- Seleccione --</option>
-                                <option value="pending">Pendiente</option>
-                                <option value="in_progress">En curso</option>
-                                <option value="delivered">Entregado</option>
-                                <option value="cancelled">Anulado</option>
-                            </select>
-                        </div>
                     </div>
+                    <input type="hidden" id="status" name="status" value="pending">
 
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="total_price" class="form-label">Total</label>
                             <input type="number" step="0.01" class="form-control" id="total_price" name="total_price" value="0.00" readonly>
                         </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="payment_status">Estado de Pago</label>
+                            <select class="form-select" id="payment_status" name="payment_status" required>
+                                <option value="pending" selected>Pendiente</option>
+                                <option value="paid">Cancelado</option>
+                            </select>
+                        </div>
                     </div>
                     <input type="hidden" id="amount_paid" name="amount_paid" value="0.00">
-                    <input type="hidden" id="payment_status" name="payment_status" value="pending">
-                    <input type="hidden" id="payment_status_label" value="Pendiente">
 
                     <div class="mb-1">
                         <div class="d-flex align-items-center justify-content-between">
@@ -162,7 +158,7 @@
                                     <tr>
                                         <th>Producto</th>
                                         <th>Cantidad</th>
-                                        <th>Precio Unitario</th>
+                                        <th>Unidad</th>
                                         <th>Subtotal</th>
                                         <th>Acciones</th>
                                     </tr>
@@ -196,7 +192,7 @@
                         <tr>
                             <th>Producto</th>
                             <th>Cantidad</th>
-                            <th>Precio Unitario</th>
+                            <th>Unidad</th>
                             <th>Subtotal</th>
                         </tr>
                     </thead>
@@ -213,6 +209,9 @@
     @vite('resources/js/venta.js')
 @endpush
 @endsection
+
+
+
 
 
 

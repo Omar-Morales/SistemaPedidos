@@ -109,9 +109,9 @@ class VentaController extends Controller
             'tipodocumento_id' => 'required|exists:tipodocumento,id',
             'sale_date' => 'nullable|date',
             'payment_method' => 'required|in:cash,card,transfer',
-            'status' => 'nullable|in:pending,in_progress,delivered,cancelled',
             'delivery_type' => 'required|in:pickup,delivery',
             'warehouse' => 'required|in:curva,milla,santa_carolina',
+            'payment_status' => 'nullable|in:pending,paid',
             'amount_paid' => 'nullable|numeric|min:0',
         ]);
 
@@ -133,20 +133,41 @@ class VentaController extends Controller
             }
         }
 
+        foreach ($details as $index => $item) {
+            if (
+                !isset($item['product_id']) || !is_numeric($item['product_id']) ||
+                !isset($item['quantity']) || !is_numeric($item['quantity']) || $item['quantity'] < 1 ||
+                !isset($item['unit']) || trim($item['unit']) === '' ||
+                !isset($item['subtotal']) || !is_numeric($item['subtotal']) || $item['subtotal'] < 0
+            ) {
+                return response()->json([
+                    'message' => "Detalle invalido en la posicion {$index}.",
+                    'errors' => [
+                        "details[{$index}]" => ['Debe indicar producto, cantidad, unidad y subtotal validos.'],
+                    ],
+                ], 422);
+            }
+        }
+
         DB::beginTransaction();
 
         try {
-            $total = collect($details)->sum(fn ($item) => $item['quantity'] * $item['unit_price']);
+            $total = collect($details)->sum(function ($item) {
+                return isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
+            });
 
-            $status = $request->input('status') ?? 'pending';
+            $status = 'pending';
             $legacyStatus = $this->mapStatusToLegacy($status);
             $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
             $deliveryType = $request->input('delivery_type', 'pickup');
             $warehouse = $request->input('warehouse', 'curva');
-            $amountPaid = (float) $request->input('amount_paid', 0);
+            $requestedPaymentStatus = $request->input('payment_status', 'pending');
+            if (!in_array($requestedPaymentStatus, ['pending', 'paid'], true)) {
+                $requestedPaymentStatus = 'pending';
+            }
+            $amountPaid = $requestedPaymentStatus === 'paid' ? $total : 0;
             $difference = $total - $amountPaid;
-            $difference = $total - $amountPaid;
-            $paymentStatus = $this->calculatePaymentStatus($total, $amountPaid);
+            $paymentStatus = $requestedPaymentStatus;
 
             $venta = Venta::create([
                 'customer_id' => $request->customer_id,
@@ -170,29 +191,37 @@ class VentaController extends Controller
             foreach ($details as $item) {
                 $producto = $productos->get($item['product_id']);
 
-                if ($legacyStatus === 'completed' && $producto->quantity < $item['quantity']) {
+                $quantity = (int) $item['quantity'];
+                $unitLabel = substr(trim((string) ($item['unit'] ?? '')), 0, 50);
+                $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
+                $unitPrice = $quantity > 0 ? $subtotal / $quantity : 0;
+
+                if ($legacyStatus === 'completed' && $producto->quantity < $quantity) {
                     throw new \RuntimeException('Stock insuficiente para: ' . $producto->name);
                 }
+
+                $total += $subtotal;
 
                 DetalleVenta::create([
                     'sale_id' => $venta->id,
                     'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'subtotal' => $item['quantity'] * $item['unit_price'],
+                    'quantity' => $quantity,
+                    'unit' => $unitLabel,
+                    'unit_price' => $unitPrice,
+                    'subtotal' => $subtotal,
                 ]);
 
                 Inventory::create([
                     'product_id' => $item['product_id'],
                     'type' => 'sale',
-                    'quantity' => $legacyStatus === 'completed' ? -$item['quantity'] : 0,
+                    'quantity' => $legacyStatus === 'completed' ? -$quantity : 0,
                     'reason' => $this->inventoryReason($status, $venta->id),
                     'user_id' => auth()->id(),
                     'reference_id' => $venta->id,
                 ]);
 
                 if ($legacyStatus === 'completed') {
-                    $producto->decrement('quantity', $item['quantity']);
+                    $producto->decrement('quantity', $quantity);
                     $this->actualizarEstadoProducto($producto);
                 }
             }
@@ -261,12 +290,14 @@ class VentaController extends Controller
                 'total' => (float) $venta->total_price,
                 'amount_paid' => (float) $venta->amount_paid,
                 'payment_status' => $venta->payment_status,
+                'difference' => (float) $venta->difference,
                 'codigo' => $venta->codigo,
                 'detalle' => $venta->detalles->map(function (DetalleVenta $detalle) {
                     return [
                         'id' => $detalle->id,
                         'product_id' => $detalle->product_id,
                         'quantity' => $detalle->quantity,
+                        'unit' => $detalle->unit,
                         'unit_price' => $detalle->unit_price,
                         'subtotal' => $detalle->subtotal,
                     ];
@@ -306,29 +337,31 @@ class VentaController extends Controller
 
         foreach ($details as $index => $item) {
             if (
-                !isset($item['product_id'], $item['quantity'], $item['unit_price']) ||
-                !is_numeric($item['product_id']) ||
-                !is_numeric($item['quantity']) ||
-                !is_numeric($item['unit_price']) ||
-                $item['quantity'] < 1 ||
-                $item['unit_price'] < 0
+                !isset($item['product_id']) || !is_numeric($item['product_id']) ||
+                !isset($item['quantity']) || !is_numeric($item['quantity']) || $item['quantity'] < 1 ||
+                !isset($item['unit']) || trim($item['unit']) === '' ||
+                !isset($item['subtotal']) || !is_numeric($item['subtotal']) || $item['subtotal'] < 0
             ) {
                 return response()->json([
-                    'message' => "Detalle invlido en la posicin {$index}.",
+                    'message' => "Detalle invalido en la posicion {$index}.",
                     'errors' => [
-                        "details[{$index}]" => ['Debe indicar producto, cantidad y precio unitario vlidos.'],
+                        "details[{$index}]" => ['Debe indicar producto, cantidad, unidad y subtotal validos.'],
                     ],
                 ], 422);
             }
         }
 
-        DB::transaction(function () use ($venta, $request, $details, $originalData, $originalStatus) {
+        $requestedPaymentStatus = $request->input('payment_status', $venta->payment_status ?? 'pending');
+        if (!in_array($requestedPaymentStatus, ['pending', 'paid'], true)) {
+            $requestedPaymentStatus = 'pending';
+        }
+
+        DB::transaction(function () use ($venta, $request, $details, $originalData, $originalStatus, $requestedPaymentStatus) {
             $status = $request->input('status') ?? 'pending';
             $legacyStatus = $this->mapStatusToLegacy($status);
             $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
             $deliveryType = $request->input('delivery_type', 'pickup');
             $warehouse = $request->input('warehouse', 'curva');
-            $amountPaid = (float) $request->input('amount_paid', 0);
 
             $productIds = collect($details)->pluck('product_id')->unique();
             $productos = Product::whereIn('id', $productIds)->get()->keyBy('id');
@@ -363,37 +396,43 @@ class VentaController extends Controller
             foreach ($details as $item) {
                 $producto = $productos->get($item['product_id']);
 
-                if ($legacyStatus === 'completed' && $producto->quantity < $item['quantity']) {
+                $quantity = (int) $item['quantity'];
+                $unitLabel = substr(trim((string) ($item['unit'] ?? '')), 0, 50);
+                $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
+                $unitPrice = $quantity > 0 ? $subtotal / $quantity : 0;
+                $total += $subtotal;
+
+                if ($legacyStatus === 'completed' && $producto->quantity < $quantity) {
                     throw new \RuntimeException('Stock insuficiente para: ' . $producto->name);
                 }
-
-                $subtotal = $item['quantity'] * $item['unit_price'];
-                $total += $subtotal;
 
                 DetalleVenta::create([
                     'sale_id' => $venta->id,
                     'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
+                    'quantity' => $quantity,
+                    'unit' => $unitLabel,
+                    'unit_price' => $unitPrice,
                     'subtotal' => $subtotal,
                 ]);
 
                 Inventory::create([
                     'product_id' => $item['product_id'],
                     'type' => 'sale',
-                    'quantity' => $legacyStatus === 'completed' ? -$item['quantity'] : 0,
+                    'quantity' => $legacyStatus === 'completed' ? -$quantity : 0,
                     'reason' => $this->inventoryReason($status, $venta->id),
                     'reference_id' => $venta->id,
                     'user_id' => auth()->id(),
                 ]);
 
                 if ($legacyStatus === 'completed') {
-                    $producto->decrement('quantity', $item['quantity']);
+                    $producto->decrement('quantity', $quantity);
                     $this->actualizarEstadoProducto($producto);
                 }
             }
 
-            $paymentStatus = $this->calculatePaymentStatus($total, $amountPaid);
+            $amountPaid = $requestedPaymentStatus === 'paid' ? $total : 0;
+            $difference = $total - $amountPaid;
+            $paymentStatus = $requestedPaymentStatus;
 
             $venta->update([
                 'customer_id' => $request->customer_id,
@@ -559,7 +598,7 @@ class VentaController extends Controller
 
                 return $acciones ?: '<span class="text-muted">Sin acciones</span>';
             })
-            ->rawColumns(['estado_pedido', 'estado_pago', 'acciones'])
+            ->rawColumns(['estado_pedido', 'estado_pago', 'diferencia', 'acciones'])
             ->make(true);
     }
 
@@ -597,6 +636,14 @@ class VentaController extends Controller
         ]);
     }
 }
+
+
+
+
+
+
+
+
 
 
 

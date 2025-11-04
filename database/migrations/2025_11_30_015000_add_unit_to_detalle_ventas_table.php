@@ -12,13 +12,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('ventas', function (Blueprint $table) {
-            $table->decimal('difference', 10, 2)->default(0);
+        Schema::table('detalle_ventas', function (Blueprint $table) {
+            $table->string('unit', 50)->nullable()->after('quantity');
         });
-
-        DB::table('ventas')->update([
-            'difference' => DB::raw('total_price - amount_paid'),
-        ]);
     }
 
     /**
@@ -26,8 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('ventas', function (Blueprint $table) {
-            $table->dropColumn('difference');
+        Schema::table('detalle_ventas', function (Blueprint $table) {
+            $table->dropColumn('unit');
         });
     }
 };

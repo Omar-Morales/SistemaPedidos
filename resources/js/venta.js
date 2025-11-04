@@ -8,8 +8,7 @@ const tablaDetalle = document.getElementById('detalleVentaBody');
 const totalInput = document.getElementById('total_price');
 const saleDateInput = document.getElementById('sale_date');
 const amountPaidInput = document.getElementById('amount_paid');
-const paymentStatusHidden = document.getElementById('payment_status');
-const paymentStatusLabel = document.getElementById('payment_status_label');
+const paymentStatusSelect = document.getElementById('payment_status');
 const btnAgregarProducto = document.getElementById('addProductRow');
 let products = [];
 
@@ -64,14 +63,14 @@ const $payment_method = $('#payment_method');
 const $delivery_type = $('#delivery_type');
 const $warehouse = $('#warehouse');
 
-const paymentStatusLabels = {
+const paymentStatusText = {
     pending: 'Pendiente',
     to_collect: 'Saldo pendiente',
     change: 'Vuelto pendiente',
     paid: 'Cancelado'
 };
 
-[$status, $customer_id, $tipodocumento_id, $payment_method, $delivery_type, $warehouse].forEach($el => {
+[$customer_id, $tipodocumento_id, $payment_method, $delivery_type, $warehouse].forEach($el => {
     if (!$el.hasClass('select2-hidden-accessible')) {
         $el.select2({
             dropdownParent: $('#modalVenta'),
@@ -84,33 +83,36 @@ const paymentStatusLabels = {
 });
 
 function actualizarEstadoPago() {
-    if (!paymentStatusHidden) return;
+    if (!paymentStatusSelect) return;
 
     const total = parseFloat(totalInput?.value) || 0;
-    const amount = parseFloat(amountPaidInput?.value) || 0;
-    let statusCode = 'pending';
+    let statusCode = paymentStatusSelect.value || 'pending';
 
-    if (amount <= 0) {
-        statusCode = 'pending';
-    } else if (amount < total) {
-        statusCode = 'to_collect';
-    } else if (amount > total) {
-        statusCode = 'change';
-    } else {
-        statusCode = 'paid';
+    if (!['pending', 'paid'].includes(statusCode)) {
+        if (amountPaidInput) {
+            const existingAmount = parseFloat(amountPaidInput.value) || 0;
+            amountPaidInput.value = existingAmount.toFixed(2);
+        }
+        return;
     }
 
-    paymentStatusHidden.value = statusCode;
-    if (paymentStatusLabel) {
-        paymentStatusLabel.value = paymentStatusLabels[statusCode] || statusCode;
+    let amount = 0;
+    if (statusCode === 'paid') {
+        amount = total;
     }
+
+    if (amountPaidInput) {
+        amountPaidInput.value = amount.toFixed(2);
+    }
+
+    paymentStatusSelect.value = statusCode;
 }
 
 
 function resetearModalVenta() {
     formVenta.reset();
     $('#venta_id').val('');
-    $status.val('').trigger('change');
+    $('#status').val('pending');
     $customer_id.val('').trigger('change');
     $tipodocumento_id.val('').trigger('change');
     $payment_method.val('').trigger('change');
@@ -123,8 +125,10 @@ function resetearModalVenta() {
 
     if (totalInput) totalInput.value = '0.00';
     if (amountPaidInput) amountPaidInput.value = '0.00';
-    if (paymentStatusHidden) paymentStatusHidden.value = 'pending';
-    if (paymentStatusLabel) paymentStatusLabel.value = paymentStatusLabels.pending;
+    if (paymentStatusSelect) {
+        paymentStatusSelect.disabled = false;
+        paymentStatusSelect.value = 'pending';
+    }
 
     if ($.fn.DataTable.isDataTable('#detalleVentaTableEditable')) {
         $('#detalleVentaTableEditable').DataTable().clear().destroy();
@@ -233,7 +237,7 @@ const table = $('#ventasTable').DataTable({
         { data: 'fecha', name: 'fecha' },
         { data: 'total', name: 'total' },
         { data: 'monto_pagado', name: 'amount_paid' },
-        { data: 'diferencia', name: 'diferencia' },
+        { data: 'diferencia', name: 'difference' },
         { data: 'tipo_entrega', name: 'delivery_type' },
         { data: 'almacen', name: 'warehouse' },
         { data: 'estado_pedido', name: 'estado_pedido' },
@@ -351,8 +355,9 @@ function calcularTotal() {
 function validarFila(row) {
     const pid = row.querySelector('.product-select').value;
     const qty = parseFloat(row.querySelector('.quantity-input').value);
-    const cost = parseFloat(row.querySelector('.unit-price-input').value);
-    return pid && qty > 0 && cost >= 0;
+    const unitValue = row.querySelector('.unit-input').value.trim();
+    const subtotalValue = parseFloat(row.querySelector('.subtotal-input').value);
+    return pid && qty > 0 && unitValue !== '' && subtotalValue >= 0;
 }
 
 function productoYaExiste(productId, currentRow = null) {
@@ -375,23 +380,26 @@ function productoYaExiste(productId, currentRow = null) {
 
 function agregarFilaProducto(data = {}) {
     const selectedId = data.product_id || '';
-    const quantity = parseFloat(data.quantity) || '';
-    const cost = parseFloat(data.unit_price) || '';
-    const subtotal = quantity && cost ? (quantity * cost).toFixed(2) : '';
+    const quantity = data.quantity !== undefined ? data.quantity : '';
+    const unit = data.unit ?? '';
+    const subtotalValue = data.subtotal !== undefined && data.subtotal !== null && data.subtotal !== ''
+        ? parseFloat(data.subtotal)
+        : '';
+    const subtotal = subtotalValue === '' ? '' : subtotalValue.toFixed(2);
 
-    const options = products.map(p =>
-        `<option value="${p.id}" ${p.id == selectedId ? 'selected' : ''}>${p.name}</option>`
-    ).join('');
+    const options = products
+        .map(p => `<option value="${p.id}" ${p.id == selectedId ? 'selected' : ''}>${p.name}</option>`)
+        .join('');
 
     const dt = $('#detalleVentaTableEditable').DataTable();
-   dt.row.add([
+    dt.row.add([
         `<select class="form-select product-select" required>
             <option value="">Seleccione un producto</option>
             ${options}
          </select>`,
         `<input type="number" class="form-control quantity-input" min="1" value="${quantity}" required>`,
-        `<input type="number" class="form-control unit-price-input" step="0.01" min="0" value="${cost}" required>`,
-        `<input type="text" class="form-control subtotal-input" value="${subtotal}" readonly>`,
+        `<input type="text" class="form-control unit-input" maxlength="50" value="${unit}" required>`,
+        `<input type="number" class="form-control subtotal-input" step="0.01" min="0" value="${subtotal}" required>`,
         `<button type="button" class="btn btn-danger remove-row">Eliminar</button>`
     ]).draw(false);
 
@@ -410,17 +418,17 @@ function agregarFilaProducto(data = {}) {
                 containerCssClass: 'select2-in-modal'
             });
     }
+
+    calcularTotal();
 }
 
 btnAgregarProducto?.addEventListener('click', agregarFilaProducto);
 
-$(document).on('input', '.quantity-input, .unit-price-input', function () {
-    const $row = $(this).closest('tr');
-    const qty = parseFloat($row.find('.quantity-input').val()) || 0;
-    const cost = parseFloat($row.find('.unit-price-input').val()) || 0;
-    const subtotal = qty * cost;
+$(document).on('input', '.subtotal-input', function () {
+    calcularTotal();
+});
 
-    $row.find('.subtotal-input').val(subtotal.toFixed(2));
+$(document).on('input', '.quantity-input', function () {
     calcularTotal();
 });
 
@@ -455,13 +463,15 @@ formVenta.addEventListener('submit', function (e) {
 
         const select = row.querySelector('.product-select');
         const qtyInput = row.querySelector('.quantity-input');
-        const costInput = row.querySelector('.unit-price-input');
+        const unitInput = row.querySelector('.unit-input');
+        const subtotalInput = row.querySelector('.subtotal-input');
 
         const pid = select?.value;
         const qty = parseFloat(qtyInput?.value);
-        const cost = parseFloat(costInput?.value);
+        const unit = unitInput?.value.trim() || '';
+        const subtotal = parseFloat(subtotalInput?.value);
 
-        if (!pid || qty <= 0 || cost < 0) {
+        if (!pid || qty <= 0 || unit === '' || subtotal < 0 || Number.isNaN(subtotal)) {
             valido = false;
             return;
         }
@@ -476,7 +486,8 @@ formVenta.addEventListener('submit', function (e) {
         detalle.push({
             product_id: pid,
             quantity: qty,
-            unit_price: cost
+            unit,
+            subtotal
         });
     });
 
@@ -560,14 +571,28 @@ $(document).on('click', '.edit-btn', async function () {
         $('#sale_date').val(venta.fecha);
         $('#delivery_type').val(venta.delivery_type).trigger('change');
         $('#warehouse').val(venta.warehouse).trigger('change');
-        $('#status').val(venta.estado).trigger('change');
+        $('#status').val(venta.estado ?? 'pending');
         $('#payment_method').val(venta.payment_method).trigger('change');
         $('#total_price').val(parseFloat(venta.total).toFixed(2));
         if (amountPaidInput) amountPaidInput.value = parseFloat(venta.amount_paid).toFixed(2);
-        if (paymentStatusHidden) {
-            paymentStatusHidden.value = venta.payment_status;
-            if (paymentStatusLabel) {
-                paymentStatusLabel.value = paymentStatusLabels[venta.payment_status] || venta.payment_status;
+        if (paymentStatusSelect) {
+            paymentStatusSelect.disabled = false;
+            const currentStatus = venta.payment_status || 'pending';
+
+            if (!['pending', 'paid'].includes(currentStatus)) {
+                if (!paymentStatusSelect.querySelector(`option[value="${currentStatus}"]`)) {
+                    const option = document.createElement('option');
+                    option.value = currentStatus;
+                    option.textContent = paymentStatusText[currentStatus] || currentStatus;
+                    paymentStatusSelect.appendChild(option);
+                }
+                paymentStatusSelect.value = currentStatus;
+                paymentStatusSelect.disabled = true;
+                if (amountPaidInput) {
+                    amountPaidInput.value = parseFloat(venta.amount_paid).toFixed(2);
+                }
+            } else {
+                paymentStatusSelect.value = currentStatus;
             }
         }
         actualizarEstadoPago();
@@ -652,12 +677,13 @@ $(document).on('click', '.ver-detalle-btn', function () {
             tbody.innerHTML = '';
 
             productos.forEach(item => {
-                const subtotal = parseFloat(item.quantity) * parseFloat(item.unit_price);
+                const unitLabel = item.unit ?? '';
+                const subtotal = parseFloat(item.subtotal ?? 0);
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${item.product_name}</td>
                     <td>${item.quantity}</td>
-                    <td>S/ ${parseFloat(item.unit_price).toFixed(2)}</td>
+                    <td>${unitLabel}</td>
                     <td>S/ ${subtotal.toFixed(2)}</td>
                 `;
                 tbody.appendChild(row);
@@ -769,3 +795,11 @@ $('#modalDetalleVenta').on('hidden.bs.modal', function () {
     }
     document.getElementById('detalleVentaBodydos').innerHTML = '';
 });
+
+
+
+
+
+
+
+

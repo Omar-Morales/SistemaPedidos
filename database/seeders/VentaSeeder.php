@@ -59,13 +59,14 @@ class VentaSeeder extends Seeder
                     $unitPrice = rand(10, 100);
                     $subtotal = $quantity * $unitPrice;
 
-                    DetalleVenta::create([
-                        'sale_id' => $venta->id,
-                        'product_id' => $product->id,
-                        'quantity' => $quantity,
-                        'unit_price' => $unitPrice,
-                        'subtotal' => $subtotal,
-                    ]);
+                DetalleVenta::create([
+                    'sale_id' => $venta->id,
+                    'product_id' => $product->id,
+                    'quantity' => $quantity,
+                    'unit' => 'unidad',
+                    'unit_price' => $unitPrice,
+                    'subtotal' => $subtotal,
+                ]);
 
                     Inventory::create([
                         'product_id' => $product->id,
@@ -103,4 +104,5 @@ class VentaSeeder extends Seeder
         });
     }
 }
+
 
