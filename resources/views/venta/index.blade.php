@@ -103,7 +103,7 @@
                     </div>
 
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 col-lg-4 mb-3">
                             <label for="warehouse" class="form-label">Almacen</label>
                             <select class="form-select" id="warehouse" name="warehouse" required>
                                 <option value="">-- Seleccione --</option>
@@ -112,15 +112,13 @@
                                 <option value="santa_carolina">Santa Carolina</option>
                             </select>
                         </div>
-                    </div>
 
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 col-lg-4 mb-3">
                             <label for="sale_date" class="form-label">Fecha</label>
                             <input type="date" class="form-control" id="sale_date" name="sale_date" value="{{ now()->format('Y-m-d') }}" required>
                         </div>
 
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 col-lg-4 mb-3">
                             <label for="delivery_type" class="form-label">Tipo de Entrega</label>
                             <select class="form-select" id="delivery_type" name="delivery_type" required>
                                 <option value="">-- Seleccione --</option>
@@ -132,12 +130,12 @@
                     <input type="hidden" id="status" name="status" value="pending">
 
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 col-lg-4 mb-3">
                             <label for="total_price" class="form-label">Total</label>
                             <input type="number" step="0.01" class="form-control" id="total_price" name="total_price" value="0.00" readonly>
                         </div>
 
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 col-lg-4 mb-3">
                             <label class="form-label" for="payment_status">Estado de Pago</label>
                             <select class="form-select" id="payment_status" name="payment_status" required>
                                 <option value="pending" selected>Pendiente</option>

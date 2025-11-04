@@ -192,7 +192,8 @@ class VentaController extends Controller
                 $producto = $productos->get($item['product_id']);
 
                 $quantity = (int) $item['quantity'];
-                $unitLabel = substr(trim((string) ($item['unit'] ?? '')), 0, 50);
+                $unitValue = isset($item['unit']) ? (float) $item['unit'] : 0;
+                $unitLabel = rtrim(rtrim(number_format($unitValue, 2, '.', ''), '0'), '.');
                 $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
                 $unitPrice = $quantity > 0 ? $subtotal / $quantity : 0;
 
@@ -397,7 +398,8 @@ class VentaController extends Controller
                 $producto = $productos->get($item['product_id']);
 
                 $quantity = (int) $item['quantity'];
-                $unitLabel = substr(trim((string) ($item['unit'] ?? '')), 0, 50);
+                $unitValue = isset($item['unit']) ? (float) $item['unit'] : 0;
+                $unitLabel = rtrim(rtrim(number_format($unitValue, 2, '.', ''), '0'), '.');
                 $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
                 $unitPrice = $quantity > 0 ? $subtotal / $quantity : 0;
                 $total += $subtotal;
@@ -616,8 +618,9 @@ class VentaController extends Controller
             return [
                 'product_name' => $nombreBase,
                 'quantity' => $item->quantity,
+                'unit' => $item->unit,
                 'unit_price' => $item->unit_price,
-                'subtotal' => $item->quantity * $item->unit_price,
+                'subtotal' => $item->subtotal,
             ];
         });
 
@@ -636,6 +639,7 @@ class VentaController extends Controller
         ]);
     }
 }
+
 
 
 

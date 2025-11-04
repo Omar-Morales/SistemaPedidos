@@ -355,9 +355,9 @@ function calcularTotal() {
 function validarFila(row) {
     const pid = row.querySelector('.product-select').value;
     const qty = parseFloat(row.querySelector('.quantity-input').value);
-    const unitValue = row.querySelector('.unit-input').value.trim();
+    const unitValue = parseFloat(row.querySelector('.unit-input').value);
     const subtotalValue = parseFloat(row.querySelector('.subtotal-input').value);
-    return pid && qty > 0 && unitValue !== '' && subtotalValue >= 0;
+    return pid && qty > 0 && Number.isFinite(unitValue) && unitValue >= 0 && subtotalValue >= 0;
 }
 
 function productoYaExiste(productId, currentRow = null) {
@@ -381,7 +381,9 @@ function productoYaExiste(productId, currentRow = null) {
 function agregarFilaProducto(data = {}) {
     const selectedId = data.product_id || '';
     const quantity = data.quantity !== undefined ? data.quantity : '';
-    const unit = data.unit ?? '';
+    const unitValue = data.unit !== undefined && data.unit !== null && data.unit !== ''
+        ? Number(data.unit)
+        : '';
     const subtotalValue = data.subtotal !== undefined && data.subtotal !== null && data.subtotal !== ''
         ? parseFloat(data.subtotal)
         : '';
@@ -398,7 +400,7 @@ function agregarFilaProducto(data = {}) {
             ${options}
          </select>`,
         `<input type="number" class="form-control quantity-input" min="1" value="${quantity}" required>`,
-        `<input type="text" class="form-control unit-input" maxlength="50" value="${unit}" required>`,
+        `<input type="number" class="form-control unit-input" min="0" step="0.01" value="${unitValue === '' ? '' : unitValue}" required>`,
         `<input type="number" class="form-control subtotal-input" step="0.01" min="0" value="${subtotal}" required>`,
         `<button type="button" class="btn btn-danger remove-row">Eliminar</button>`
     ]).draw(false);
@@ -677,7 +679,7 @@ $(document).on('click', '.ver-detalle-btn', function () {
             tbody.innerHTML = '';
 
             productos.forEach(item => {
-                const unitLabel = item.unit ?? '';
+                const unitLabel = String(item.unit ?? '');
                 const subtotal = parseFloat(item.subtotal ?? 0);
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -795,6 +797,8 @@ $('#modalDetalleVenta').on('hidden.bs.modal', function () {
     }
     document.getElementById('detalleVentaBodydos').innerHTML = '';
 });
+
+
 
 
 
