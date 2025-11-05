@@ -36,7 +36,6 @@
                                     <tr>
                                         <th>ID</th>
                                         <th>Fecha</th>
-                                        <th>Usuario</th>
                                         <th>Cliente</th>
                                         <th>Producto</th>
                                         <th>Cantidad</th>
@@ -96,9 +95,11 @@
                             <label for="payment_method" class="form-label">Metodo de Pago</label>
                             <select class="form-select" id="payment_method" name="payment_method" required>
                                 <option value="">-- Seleccione --</option>
-                                <option value="cash">Efectivo</option>
-                                <option value="card">Tarjeta</option>
-                                <option value="transfer">Transferencia</option>
+                                <option value="efectivo">Efectivo</option>
+                                <option value="trans_bcp">Trans. BCP</option>
+                                <option value="trans_bbva">Trans. BBVA</option>
+                                <option value="yape">Yape</option>
+                                <option value="plin">Plin</option>
                             </select>
                         </div>
                     </div>
@@ -140,7 +141,7 @@
                             <label class="form-label" for="payment_status">Estado de Pago</label>
                             <select class="form-select" id="payment_status" name="payment_status" required>
                                 <option value="pending" selected>Pendiente</option>
-                                <option value="paid">Cancelado</option>
+                                <option value="paid">Pagado</option>
                             </select>
                         </div>
                     </div>
@@ -212,11 +213,6 @@
     @vite('resources/js/venta.js')
 @endpush
 @endsection
-
-
-
-
-
 
 
 

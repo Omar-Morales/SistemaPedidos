@@ -83,6 +83,10 @@ class VentaController extends Controller
     {
         $normalized = strtolower($status ?? '');
 
+        if ($normalized === 'cancelled') {
+            return 'cancelled';
+        }
+
         if ($normalized === 'paid') {
             return 'paid';
         }
@@ -122,6 +126,106 @@ class VentaController extends Controller
     private function shouldAffectInventory(string $status): bool
     {
         return $status === 'delivered';
+    }
+
+    private const PAYMENT_METHOD_LABELS = [
+        'efectivo' => 'Efectivo',
+        'trans_bcp' => 'Trans. BCP',
+        'trans_bbva' => 'Trans. BBVA',
+        'yape' => 'Yape',
+        'plin' => 'Plin',
+    ];
+
+    private const CURRENT_PAYMENT_METHODS = [
+        'efectivo',
+        'trans_bcp',
+        'trans_bbva',
+        'yape',
+        'plin',
+    ];
+
+    private const LEGACY_PAYMENT_METHOD_MAP = [
+        'cash' => 'efectivo',
+        'card' => 'trans_bbva',
+        'transfer' => 'trans_bcp',
+    ];
+
+    private function validPaymentMethods(): array
+    {
+        return self::CURRENT_PAYMENT_METHODS;
+    }
+
+    private function paymentMethodRule(string $baseRule = 'nullable'): string
+    {
+        return $baseRule . '|in:' . implode(',', $this->validPaymentMethods());
+    }
+
+    private function normalizePaymentMethod(?string $method): ?string
+    {
+        if (!is_string($method)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($method));
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (in_array($normalized, self::CURRENT_PAYMENT_METHODS, true)) {
+            return $normalized;
+        }
+
+        $cleaned = str_replace('.', '', $normalized);
+        $cleaned = preg_replace('/\s+/', '_', $cleaned);
+
+        if (in_array($cleaned, self::CURRENT_PAYMENT_METHODS, true)) {
+            return $cleaned;
+        }
+
+        if (isset(self::LEGACY_PAYMENT_METHOD_MAP[$normalized])) {
+            $mapped = self::LEGACY_PAYMENT_METHOD_MAP[$normalized];
+            return in_array($mapped, self::CURRENT_PAYMENT_METHODS, true) ? $mapped : null;
+        }
+
+        if (isset(self::LEGACY_PAYMENT_METHOD_MAP[$cleaned])) {
+            $mapped = self::LEGACY_PAYMENT_METHOD_MAP[$cleaned];
+            return in_array($mapped, self::CURRENT_PAYMENT_METHODS, true) ? $mapped : null;
+        }
+
+        return null;
+    }
+
+    private function paymentMethodLabel(?string $method): string
+    {
+        if (!is_string($method) || trim($method) === '') {
+            return '-';
+        }
+
+        $normalized = strtolower(trim($method));
+
+        if (isset(self::PAYMENT_METHOD_LABELS[$normalized])) {
+            return self::PAYMENT_METHOD_LABELS[$normalized];
+        }
+
+        $cleaned = str_replace('.', '', $normalized);
+        $cleaned = preg_replace('/\s+/', '_', $cleaned);
+
+        if (isset(self::PAYMENT_METHOD_LABELS[$cleaned])) {
+            return self::PAYMENT_METHOD_LABELS[$cleaned];
+        }
+
+        if (isset(self::LEGACY_PAYMENT_METHOD_MAP[$normalized])) {
+            $mapped = self::LEGACY_PAYMENT_METHOD_MAP[$normalized];
+            return self::PAYMENT_METHOD_LABELS[$mapped] ?? '-';
+        }
+
+        if (isset(self::LEGACY_PAYMENT_METHOD_MAP[$cleaned])) {
+            $mapped = self::LEGACY_PAYMENT_METHOD_MAP[$cleaned];
+            return self::PAYMENT_METHOD_LABELS[$mapped] ?? '-';
+        }
+
+        return '-';
     }
 
     private function formatUnitValue($value): string
@@ -164,7 +268,7 @@ class VentaController extends Controller
             'customer_id' => 'required|exists:customers,id',
             'tipodocumento_id' => 'required|exists:tipodocumento,id',
             'sale_date' => 'nullable|date',
-            'payment_method' => 'nullable|in:cash,card,transfer',
+            'payment_method' => $this->paymentMethodRule(),
             'delivery_type' => 'nullable|in:pickup,delivery',
             'warehouse' => 'nullable|in:curva,milla,santa_carolina',
         ]);
@@ -173,6 +277,8 @@ class VentaController extends Controller
         if ($cliente && $cliente->status === 'inactive') {
             return response()->json(['message' => "El cliente '{$cliente->name}' esta inactivo."], 422);
         }
+
+        $paymentMethodVenta = $this->normalizePaymentMethod($request->payment_method) ?? 'efectivo';
 
         $productIds = collect($rawDetails)->pluck('product_id')->unique();
         $productos = Product::whereIn('id', $productIds)->get()->keyBy('id');
@@ -202,13 +308,9 @@ class VentaController extends Controller
                 return response()->json(['message' => "El producto '{$producto->name}' esta repetido."], 422);
             }
 
-            $quantity = isset($item['quantity']) ? (int) $item['quantity'] : 0;
-            $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
-            $unitInput = $item['unit'] ?? null;
-            $amountPaid = isset($item['amount_paid']) ? max(0, (float) $item['amount_paid']) : 0;
-            $warehouseDetalle = $item['warehouse'] ?? $venta->warehouse;
-            $deliveryDetalle = $item['delivery_type'] ?? $venta->delivery_type;
-            $paymentMethodDetalle = $item['payment_method'] ?? $venta->payment_method;
+            $warehouseDetalle = $item['warehouse'] ?? $request->warehouse;
+            $deliveryDetalle = $item['delivery_type'] ?? $request->delivery_type;
+            $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
             if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
                 return response()->json([
@@ -222,10 +324,50 @@ class VentaController extends Controller
                 ], 422);
             }
 
-            if ($paymentMethodDetalle && !in_array($paymentMethodDetalle, ['cash', 'card', 'transfer'], true)) {
+            if ($paymentMethodDetalle) {
+                $normalizedPaymentMethod = $this->normalizePaymentMethod($paymentMethodDetalle);
+                if ($normalizedPaymentMethod === null) {
+                    return response()->json([
+                        'message' => "Metodo de pago invalido para el item {$index}.",
+                    ], 422);
+                }
+                $paymentMethodDetalle = $normalizedPaymentMethod;
+            } else {
+                $paymentMethodDetalle = null;
+            }
+
+            $quantity = isset($item['quantity']) ? (int) $item['quantity'] : 0;
+            $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
+            $unitInput = $item['unit'] ?? null;
+            $amountPaid = isset($item['amount_paid']) ? max(0, (float) $item['amount_paid']) : 0;
+            $warehouseDetalle = $item['warehouse'] ?? $venta->warehouse;
+            $deliveryDetalle = $item['delivery_type'] ?? $venta->delivery_type;
+            $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
+
+            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
                 return response()->json([
-                    'message' => "Metodo de pago invalido para el item {$index}.",
+                    'message' => "Almacen invalido para el item {$index}.",
                 ], 422);
+            }
+
+            if (!in_array($deliveryDetalle, ['pickup', 'delivery'], true)) {
+                return response()->json([
+                    'message' => "Tipo de entrega invalido para el item {$index}.",
+                ], 422);
+            }
+
+            if ($paymentMethodDetalle) {
+                $normalizedPaymentMethod = $this->normalizePaymentMethod($paymentMethodDetalle);
+
+                if ($normalizedPaymentMethod === null) {
+                    return response()->json([
+                        'message' => "Metodo de pago invalido para el item {$index}.",
+                    ], 422);
+                }
+
+                $paymentMethodDetalle = $normalizedPaymentMethod;
+            } else {
+                $paymentMethodDetalle = null;
             }
 
             if ($quantity < 1 || !is_numeric($subtotal) || $subtotal < 0) {
@@ -239,7 +381,7 @@ class VentaController extends Controller
 
             $warehouseDetalle = $item['warehouse'] ?? $request->warehouse;
             $deliveryDetalle = $item['delivery_type'] ?? $request->delivery_type;
-            $paymentMethodDetalle = $item['payment_method'] ?? $request->payment_method;
+            $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
             if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
                 return response()->json([
@@ -253,15 +395,23 @@ class VentaController extends Controller
                 ], 422);
             }
 
-            if ($paymentMethodDetalle && !in_array($paymentMethodDetalle, ['cash', 'card', 'transfer'], true)) {
-                return response()->json([
-                    'message' => "Metodo de pago invalido para el item {$index}.",
-                ], 422);
+            if ($paymentMethodDetalle) {
+                $normalizedPaymentMethod = $this->normalizePaymentMethod($paymentMethodDetalle);
+
+                if ($normalizedPaymentMethod === null) {
+                    return response()->json([
+                        'message' => "Metodo de pago invalido para el item {$index}.",
+                    ], 422);
+                }
+
+                $paymentMethodDetalle = $normalizedPaymentMethod;
+            } else {
+                $paymentMethodDetalle = null;
             }
 
-            $warehouseDetalle = $item['warehouse'] ?? $venta->warehouse;
-            $deliveryDetalle = $item['delivery_type'] ?? $venta->delivery_type;
-            $paymentMethodDetalle = $item['payment_method'] ?? $venta->payment_method;
+            $warehouseDetalle = $item['warehouse'] ?? $request->warehouse;
+            $deliveryDetalle = $item['delivery_type'] ?? $request->delivery_type;
+            $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
             if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
                 return response()->json([
@@ -275,10 +425,18 @@ class VentaController extends Controller
                 ], 422);
             }
 
-            if ($paymentMethodDetalle && !in_array($paymentMethodDetalle, ['cash', 'card', 'transfer'], true)) {
-                return response()->json([
-                    'message' => "Metodo de pago invalido para el item {$index}.",
-                ], 422);
+            if ($paymentMethodDetalle) {
+                $normalizedPaymentMethod = $this->normalizePaymentMethod($paymentMethodDetalle);
+
+                if ($normalizedPaymentMethod === null) {
+                    return response()->json([
+                        'message' => "Metodo de pago invalido para el item {$index}.",
+                    ], 422);
+                }
+
+                $paymentMethodDetalle = $normalizedPaymentMethod;
+            } else {
+                $paymentMethodDetalle = null;
             }
 
             $statusDetalle = $this->normalizeDetailStatus($item['status'] ?? null);
@@ -326,7 +484,7 @@ class VentaController extends Controller
                 'tipodocumento_id' => $request->tipodocumento_id,
                 'user_id' => auth()->id(),
                 'sale_date' => $saleDate,
-                'payment_method' => $request->payment_method,
+                'payment_method' => $paymentMethodVenta,
                 'status' => $statusVenta,
                 'delivery_type' => $request->delivery_type,
                 'warehouse' => $request->warehouse,
@@ -433,7 +591,7 @@ class VentaController extends Controller
                 'fecha' => optional($venta->sale_date)->format('Y-m-d'),
                 'delivery_type' => $venta->delivery_type,
                 'estado' => $venta->status,
-                'payment_method' => $venta->payment_method,
+                'payment_method' => $this->normalizePaymentMethod($venta->payment_method) ?? 'efectivo',
                 'warehouse' => $venta->warehouse,
                 'total' => (float) $venta->total_price,
                 'amount_paid' => (float) $venta->amount_paid,
@@ -454,7 +612,7 @@ class VentaController extends Controller
                         'difference' => $detalle->difference,
                         'warehouse' => $detalle->warehouse,
                         'delivery_type' => $detalle->delivery_type,
-                        'payment_method' => $detalle->payment_method,
+                        'payment_method' => $this->normalizePaymentMethod($detalle->payment_method) ?? 'efectivo',
                     ];
                 }),
             ],
@@ -482,11 +640,15 @@ class VentaController extends Controller
             'customer_id' => 'required|exists:customers,id',
             'tipodocumento_id' => 'required|exists:tipodocumento,id',
             'sale_date' => 'nullable|date',
-            'payment_method' => 'required|in:cash,card,transfer',
+            'payment_method' => $this->paymentMethodRule('required'),
             'delivery_type' => 'required|in:pickup,delivery',
             'warehouse' => 'required|in:curva,milla,santa_carolina',
             'codigo' => 'nullable|string|max:50|unique:ventas,codigo,' . $venta->id,
         ]);
+
+        $paymentMethodVenta = $this->normalizePaymentMethod($request->payment_method)
+            ?? $this->normalizePaymentMethod($venta->payment_method)
+            ?? 'efectivo';
 
         $cliente = Customer::find($request->customer_id);
         if ($cliente && $cliente->status === 'inactive') {
@@ -594,7 +756,8 @@ class VentaController extends Controller
             $productos,
             $originalData,
             $originalDetails,
-            $saleDate
+            $saleDate,
+            $paymentMethodVenta
         ) {
             foreach ($venta->detalles as $detalleAnterior) {
                 if ($this->shouldAffectInventory($detalleAnterior->status)) {
@@ -649,7 +812,7 @@ class VentaController extends Controller
                 'tipodocumento_id' => $request->tipodocumento_id,
                 'sale_date' => $saleDate,
                 'status' => $statusVenta,
-                'payment_method' => $request->input('payment_method', $venta->payment_method),
+                'payment_method' => $paymentMethodVenta,
                 'delivery_type' => $request->input('delivery_type', $venta->delivery_type),
                 'warehouse' => $request->input('warehouse', $venta->warehouse),
                 'total_price' => $total,
@@ -689,7 +852,7 @@ class VentaController extends Controller
             'customer_id' => 'required|exists:customers,id',
             'tipodocumento_id' => 'required|exists:tipodocumento,id',
             'sale_date' => 'nullable|date',
-            'payment_method' => 'nullable|in:cash,card,transfer',
+            'payment_method' => $this->paymentMethodRule(),
             'delivery_type' => 'nullable|in:pickup,delivery',
             'warehouse' => 'nullable|in:curva,milla,santa_carolina',
         ]);
@@ -702,18 +865,22 @@ class VentaController extends Controller
             ], 422);
         }
 
+        $paymentMethodVenta = $this->normalizePaymentMethod($request->payment_method)
+            ?? $this->normalizePaymentMethod($venta->payment_method)
+            ?? 'efectivo';
+
         Validator::make($detailInput, [
             'product_id' => 'required|exists:products,id',
             'quantity' => 'required|numeric|min:1',
             'unit' => 'nullable|string|max:255',
             'subtotal' => 'required|numeric|min:0',
             'amount_paid' => 'nullable|numeric|min:0',
-            'payment_status' => 'nullable|in:pending,paid,to_collect,change',
+            'payment_status' => 'nullable|in:pending,paid,to_collect,change,cancelled',
             'status' => 'nullable|in:pending,in_progress,delivered,cancelled',
             'difference' => 'nullable|numeric',
             'warehouse' => 'nullable|in:curva,milla,santa_carolina',
             'delivery_type' => 'nullable|in:pickup,delivery',
-            'payment_method' => 'nullable|in:cash,card,transfer',
+            'payment_method' => $this->paymentMethodRule(),
         ])->validate();
 
         $productId = (int) $detailInput['product_id'];
@@ -723,12 +890,20 @@ class VentaController extends Controller
         $rawAmountPaid = isset($detailInput['amount_paid']) ? max(0, (float) $detailInput['amount_paid']) : 0.0;
         $normalizedStatus = $this->normalizeDetailStatus($detailInput['status'] ?? $detalle->status);
         $normalizedPaymentStatus = $this->normalizeDetailPaymentStatus($detailInput['payment_status'] ?? $detalle->payment_status, $subtotal, $rawAmountPaid);
-        $amountPaid = $normalizedPaymentStatus === 'paid' ? $subtotal : round($rawAmountPaid, 2);
+        if ($normalizedPaymentStatus === 'paid') {
+            $amountPaid = $subtotal;
+        } elseif ($normalizedPaymentStatus === 'cancelled') {
+            $amountPaid = 0;
+        } else {
+            $amountPaid = round($rawAmountPaid, 2);
+        }
         $difference = round($subtotal - $amountPaid, 2);
         $unitPrice = $quantity > 0 ? round($subtotal / $quantity, 4) : 0;
         $warehouseDetalle = $detailInput['warehouse'] ?? $detalle->warehouse ?? $venta->warehouse;
         $deliveryDetalle = $detailInput['delivery_type'] ?? $detalle->delivery_type ?? $venta->delivery_type;
-        $paymentMethodDetalle = $detailInput['payment_method'] ?? $detalle->payment_method ?? $venta->payment_method;
+        $paymentMethodDetalle = $detailInput['payment_method']
+            ?? $this->normalizePaymentMethod($detalle->payment_method)
+            ?? $paymentMethodVenta;
 
         if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
             return response()->json(['message' => 'Almacen invalido para el detalle.'], 422);
@@ -738,8 +913,14 @@ class VentaController extends Controller
             return response()->json(['message' => 'Tipo de entrega invalido para el detalle.'], 422);
         }
 
-        if ($paymentMethodDetalle && !in_array($paymentMethodDetalle, ['cash', 'card', 'transfer'], true)) {
-            return response()->json(['message' => 'Metodo de pago invalido para el detalle.'], 422);
+        if ($paymentMethodDetalle) {
+            $normalizedPaymentMethod = $this->normalizePaymentMethod($paymentMethodDetalle);
+            if ($normalizedPaymentMethod === null) {
+                return response()->json(['message' => 'Metodo de pago invalido para el detalle.'], 422);
+            }
+            $paymentMethodDetalle = $normalizedPaymentMethod;
+        } else {
+            $paymentMethodDetalle = null;
         }
 
         $productoNuevo = Product::findOrFail($productId);
@@ -758,7 +939,7 @@ class VentaController extends Controller
             'difference' => $detalle->difference,
             'warehouse' => $detalle->warehouse,
             'delivery_type' => $detalle->delivery_type,
-            'payment_method' => $detalle->payment_method,
+            'payment_method' => $this->normalizePaymentMethod($detalle->payment_method) ?? $paymentMethodVenta,
         ];
 
         try {
@@ -779,7 +960,8 @@ class VentaController extends Controller
                 $warehouseDetalle,
                 $deliveryDetalle,
                 $paymentMethodDetalle,
-                $oldDetailData
+                $oldDetailData,
+                $paymentMethodVenta
             ) {
                 $oldStatus = $detalle->status;
                 $oldProductId = $detalle->product_id;
@@ -846,7 +1028,7 @@ class VentaController extends Controller
                     'customer_id' => $request->input('customer_id'),
                     'tipodocumento_id' => $request->input('tipodocumento_id'),
                     'sale_date' => $saleDate,
-                    'payment_method' => $request->input('payment_method', $venta->payment_method),
+                    'payment_method' => $paymentMethodVenta,
                     'delivery_type' => $request->input('delivery_type', $venta->delivery_type),
                     'warehouse' => $request->input('warehouse', $venta->warehouse),
                 ]);
@@ -931,7 +1113,7 @@ class VentaController extends Controller
 
             $detalle->update([
                 'status' => 'cancelled',
-                'payment_status' => 'pending',
+                'payment_status' => 'cancelled',
                 'amount_paid' => 0,
                 'difference' => $detalle->subtotal,
             ]);
@@ -946,18 +1128,24 @@ class VentaController extends Controller
                     'amount_paid' => 0,
                     'difference' => 0,
                     'status' => 'cancelled',
-                    'payment_status' => 'pending',
+                    'payment_status' => 'cancelled',
                 ]);
             } else {
                 $total = $activeDetails->sum('subtotal');
                 $amountTotal = $activeDetails->sum('amount_paid');
+                $nuevoEstado = $this->resolveSaleStatusFromDetails($venta->detalles->pluck('status'));
+                $nuevoEstadoPago = $this->calculatePaymentStatus($total, $amountTotal);
+
+                if ($nuevoEstado === 'cancelled') {
+                    $nuevoEstadoPago = 'cancelled';
+                }
 
                 $venta->update([
                     'total_price' => $total,
                     'amount_paid' => $amountTotal,
                     'difference' => round($total - $amountTotal, 2),
-                    'status' => $this->resolveSaleStatusFromDetails($venta->detalles->pluck('status')),
-                    'payment_status' => $this->calculatePaymentStatus($total, $amountTotal),
+                    'status' => $nuevoEstado,
+                    'payment_status' => $nuevoEstadoPago,
                 ]);
             }
 
@@ -1014,7 +1202,7 @@ class VentaController extends Controller
 
                 $detalle->update([
                     'status' => 'cancelled',
-                    'payment_status' => 'pending',
+                    'payment_status' => 'cancelled',
                     'amount_paid' => 0,
                     'difference' => $detalle->subtotal,
                 ]);
@@ -1022,7 +1210,7 @@ class VentaController extends Controller
 
             $venta->update([
                 'status' => 'cancelled',
-                'payment_status' => 'pending',
+                'payment_status' => 'cancelled',
                 'amount_paid' => 0,
                 'difference' => $venta->total_price,
             ]);
@@ -1084,7 +1272,6 @@ class VentaController extends Controller
         return DataTables::of($detalles)
             ->addColumn('id', fn ($detalle) => $detalle->sale_id)
             ->addColumn('fecha', fn ($detalle) => Carbon::parse($detalle->sale_date)->format('d/m/Y'))
-            ->addColumn('usuario', fn ($detalle) => $detalle->user_name ?? '-')
             ->addColumn('cliente', fn ($detalle) => $detalle->customer_name ?? '-')
             ->addColumn('producto', function ($detalle) {
                 $nombre = $detalle->product_name ?? 'Sin nombre';
@@ -1112,12 +1299,13 @@ class VentaController extends Controller
 
                 return 'S/ ' . number_format($difference, 2);
             })
-            ->addColumn('metodo_pago', fn ($detalle) => $detalle->detalle_payment_method ?? '-')
+            ->addColumn('metodo_pago', fn ($detalle) => $this->paymentMethodLabel($detalle->detalle_payment_method))
             ->addColumn('estado_pago', function ($detalle) {
                 return match ($detalle->detalle_payment_status) {
-                    'paid' => '<span class="badge bg-success p-2">Cancelado</span>',
+                    'paid' => '<span class="badge bg-success p-2">Pagado</span>',
                     'to_collect' => '<span class="badge bg-info text-dark p-2">Saldo pendiente</span>',
                     'change' => '<span class="badge bg-secondary p-2">Vuelto pendiente</span>',
+                    'cancelled' => '<span class="badge bg-danger p-2">Anulado</span>',
                     default => '<span class="badge bg-warning text-dark p-2">Pendiente</span>',
                 };
             })
@@ -1130,8 +1318,11 @@ class VentaController extends Controller
                 };
             })
             ->addColumn('acciones', function ($detalle) use ($currentUser) {
-                if ($detalle->venta_status === 'cancelled') {
-                    return '';
+                $ventaCancelada = ($detalle->venta_status === 'cancelled');
+                $detalleCancelado = ($detalle->detalle_status === 'cancelled');
+
+                if ($ventaCancelada || $detalleCancelado) {
+                    return '<span class="text-muted">Sin acciones</span>';
                 }
 
                 $acciones = '';
@@ -1184,10 +1375,12 @@ class VentaController extends Controller
                 'amount_paid' => $item->amount_paid,
                 'difference' => $item->difference,
                 'status' => $item->status,
-                'payment_status' => $item->payment_status === 'paid' ? 'paid' : 'pending',
+                'payment_status' => in_array($item->payment_status, ['paid', 'pending', 'to_collect', 'change', 'cancelled'], true)
+                    ? $item->payment_status
+                    : 'pending',
                 'warehouse' => $item->warehouse,
                 'delivery_type' => $item->delivery_type,
-                'payment_method' => $item->payment_method,
+                'payment_method' => $this->normalizePaymentMethod($item->payment_method) ?? 'efectivo',
             ];
         });
 
@@ -1206,15 +1399,3 @@ class VentaController extends Controller
         ]);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
