@@ -75,10 +75,9 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/ventas/{id}/detalle', [VentaController::class, 'detalle'])->name('ventas.detalle');
     //Route::get('ventas/pdf/{id}', [VentaController::class, 'downloadPDF'])->name('ventas.pdf');
 
-    Route::get('/inventories/export', [InventoryController::class, 'exportInventory'])->name('inventories.export');
-    Route::get('/inventories/export/{reference_id}', [InventoryController::class, 'exportInventoryId'])->name('inventories.exportreference');
-    Route::get('/inventories/{reference_id}/pdf', [InventoryController::class, 'exportPdf'])->name('inventories.pdf');
-    Route::resource('/inventories', InventoryController::class);
+    Route::get('/inventories/daily', [InventoryController::class, 'dailyClosure'])->name('inventories.daily');
+    Route::get('/inventories/daily/export', [InventoryController::class, 'exportDailyClosure'])->name('inventories.daily.export');
+    Route::resource('/inventories', InventoryController::class)->only(['index']);
 
     Route::get('/transactions/export', [TransactionController::class, 'exportTransaction'])->name('transactions.export');
     Route::get('/transactions/export/{reference_id}', [TransactionController::class, 'exportTransactionId'])->name('transactions.exportreference');

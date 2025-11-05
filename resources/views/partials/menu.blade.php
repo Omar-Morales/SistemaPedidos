@@ -90,7 +90,7 @@
                 {{-- <li class="menu-title"><span>Inventario</span></li> --}}
                 @can('administrar.inventarios.index')
                     <li class="nav-item"><a class="nav-link menu-link" href="{{ route('inventories.index') }}"><i
-                                class="ri-filter-line"></i> <span>Listado Inventario</span></a></li>
+                                class="ri-calendar-check-line"></i> <span>Cierre Diario</span></a></li>
                 @endcan
 
                 {{-- <li class="menu-title"><span>Transaccion</span></li> --}}

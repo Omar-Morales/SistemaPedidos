@@ -1,408 +1,322 @@
 <?php
 
 namespace App\Http\Controllers;
-use Illuminate\Http\Request;
-use App\Models\Inventory;
-use App\Models\Compra;
+
+use App\Exports\DailyClosureExport;
 use App\Models\Venta;
 use Carbon\Carbon;
-use Yajra\DataTables\Facades\DataTables;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\InventoryExport;
-use App\Exports\InventoryExportId;
-use Barryvdh\DomPDF\Facade\Pdf;
-
-use Endroid\QrCode\Encoding\Encoding;
-use Endroid\QrCode\ErrorCorrectionLevel;
-use Endroid\QrCode\QrCode as EndroidQrCode;
-use Endroid\QrCode\Writer\PngWriter;
-
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 
 class InventoryController extends Controller
 {
     public function __construct()
     {
-        // 🔹 Solo el ADMINISTRADOR y Almacen pueden acceder a este controlador
-        $this->middleware(['auth', 'permission:administrar.inventarios.index'])->only('index', 'show');
-        $this->middleware(['auth', 'permission:administrar.inventarios.export'])->only('exportInventory', 'exportInventoryId', 'exportPdf');
-
+        $this->middleware(['auth', 'permission:administrar.inventarios.index'])->only(['index', 'dailyClosure']);
+        $this->middleware(['auth', 'permission:administrar.inventarios.export'])->only(['exportDailyClosure']);
     }
 
-    public function index(Request $request)
+    public function index(): \Illuminate\View\View
     {
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
+        $warehouses = $this->warehouses();
 
-        $query = Inventory::with('user')
-            ->when($startDate && $endDate, function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('created_at', [
-                    Carbon::parse($startDate)->startOfDay(),
-                    Carbon::parse($endDate)->endOfDay()
-                ]);
-            })
-            ->whereNotNull('reference_id')
+        return view('inventories.index', [
+            'warehouses' => $warehouses,
+            'defaultWarehouse' => array_key_first($warehouses),
+            'defaultDate' => Carbon::today()->toDateString(),
+        ]);
+    }
+
+    public function dailyClosure(Request $request)
+    {
+        $validated = $request->validate([
+            'warehouse' => ['required', Rule::in(array_keys($this->warehouses()))],
+            'date' => ['required', 'date'],
+        ]);
+
+        $data = $this->buildClosureData($validated['date'], $validated['warehouse']);
+
+        return response()->json($data);
+    }
+
+    public function exportDailyClosure(Request $request)
+    {
+        $validated = $request->validate([
+            'warehouse' => ['required', Rule::in(array_keys($this->warehouses()))],
+            'date' => ['required', 'date'],
+        ]);
+
+        $closure = $this->buildClosureData($validated['date'], $validated['warehouse']);
+        $warehouseLabel = $closure['meta']['warehouse_label'] ?? $validated['warehouse'];
+        $dateLabel = Carbon::parse($closure['meta']['date'] ?? $validated['date'])->format('Ymd');
+
+        return Excel::download(
+            new DailyClosureExport(
+                $closure['details'],
+                $closure['filtered_summary'],
+                $closure['meta']
+            ),
+            "cierre_diario_{$validated['warehouse']}_{$dateLabel}.xlsx"
+        );
+    }
+
+    private function buildClosureData(string $date, string $warehouse): array
+    {
+        $warehouses = $this->warehouses();
+        $dateObj = Carbon::parse($date)->startOfDay();
+
+        $allSales = Venta::with([
+                'customer:id,name',
+                'user:id,name',
+                'detalles' => function ($query) {
+                    $query->select([
+                        'id',
+                        'sale_id',
+                        'product_id',
+                        'quantity',
+                        'unit',
+                        'unit_price',
+                        'subtotal',
+                        'amount_paid',
+                        'difference',
+                        'status',
+                    ])->where('status', '!=', 'cancelled')
+                      ->with(['producto:id,name']);
+                },
+            ])
+            ->whereDate('sale_date', $dateObj)
             ->get()
-            ->groupBy(fn ($item) => $item->type . '_' . $item->reference_id)
-            ->map(function ($items) {
-                $first = $items->first();
+            ->map(function (Venta $venta) {
+                $venta->normalized_payment_method = $this->normalizePaymentMethod($venta->payment_method);
 
-                $referenceId = $first->reference_id;
-                $type = $first->type;
-                $translatedType = match ($type) {
-                'sale' => 'Venta',
-                'purchase' => 'Compra',
-                'adjustment_purchase' => 'Ajuste de Compra (Anulada)',
-                'adjustment_sale' => 'Ajuste de Venta (Anulada)',
-                default => ucfirst($type),
-                };
-
-                // Generar botones directamente (no como función anónima)
-                if (in_array($type, ['adjustment_purchase', 'adjustment_sale'])) {
-                    $acciones = '<span class="badge bg-danger p-2">Anulada</span>';
-                } else {
-                    $botones  = '';
-                    $botones  .= '<button class="btn btn-sm btn-info btn-detalle" data-id="' . $referenceId . '" data-type="' . $type . '">
-                                    Detalle
-                                </button>';
-                    if (Auth::user()->can('administrar.inventarios.export')) {
-                    $botones  .= '<button class="btn btn-sm btn-success btn-export-excel" data-id="' . $referenceId . '" data-type="' . $type . '">Excel</button>';
-                    $botones  .= '<button class="btn btn-sm btn-danger btn-export-pdf" data-id="' . $referenceId . '" data-type="' . $type . '">PDF</button>';
-                    }
-
-                     // Si no hay botones para exportar, mostrar texto "Sin acciones"
-                    if (empty(trim(strip_tags($botones )))) {
-                        $acciones = '<span class="text-muted">Sin acciones</span>';
-                    } else {
-                        $acciones = '<div class="btn-group">' . $botones . '</div>';
-                    }
-                }
-                return [
-                    'reference_id_original' => $referenceId,
-                    'total_quantity' => $items->count('quantity'),
-                    'type' => $translatedType,
-                    'reason' => $first->reason ?? '-',
-                    'user' => $first->user->name ?? 'Sistema',
-                    'created_at' => $first->created_at->format('d/m/Y H:i'),
-                    'acciones' => $acciones,
-                ];
-        })->values()
-            ->map(function ($item, $index) {
-            $item['reference_id'] = $index + 1;
-            return $item;
-        });
-
-        if ($request->ajax()) {
-            return DataTables::of($query)->rawColumns(['acciones'])->make(true);
-        }
-        return view('inventories.index');
-    }
-    public function create()
-    {
-    }
-
-    public function store(Request $request)
-    {
-    }
-
-    public function show($reference_id, Request $request)
-    {
-        $inventario = Inventory::where('reference_id', $reference_id)->where('type', $request->query('type'))->first();
-
-        if (!$inventario) {
-            return response()->json(['error' => 'Movimiento no encontrado'], 404);
-        }
-
-        if ($inventario->type === 'purchase') {
-            $compra = Compra::with('detalles.producto', 'supplier', 'user')->find($reference_id);
-            if (!$compra) return response()->json(['error' => 'Compra no encontrada'], 404);
-
-            $total = 0;
-            $detalles = $compra->detalles->map(function ($detalle) use (&$total) {
-                $subtotal = $detalle->quantity * $detalle->unit_cost;
-                $total += $subtotal;
-                return [
-                    'producto' => $detalle->producto->name ?? '—',
-                    'quantity' => $detalle->quantity,
-                    'unit_price' => $detalle->unit_cost,
-                    'subtotal' => $subtotal,
-                ];
+                return $venta;
             });
 
-            return response()->json([
-                'tipo' => 'purchase',
-                'codigo' => $compra->codigo ?? '—',
-                'fecha' => $compra->created_at,
-                'supplier' => $compra->supplier->name ?? '—',
-                'user' => $compra->user->name ?? '—',
-                'detalles' => $detalles,
-                'total' => $total,
-            ]);
-        }
+        $globalSummary = $this->summarizeSales($allSales);
 
-        if ($inventario->type === 'sale') {
-            $venta = Venta::with('detalles.producto', 'customer', 'user')->find($reference_id);
-            if (!$venta) return response()->json(['error' => 'Venta no encontrada'], 404);
+        $filteredSales = $allSales
+            ->where('warehouse', $warehouse)
+            ->values();
+        $filteredSummary = $this->summarizeSales($filteredSales);
 
-            $total = 0;
-            $detalles = $venta->detalles->map(function ($detalle) use (&$total) {
-                $subtotal = $detalle->quantity * $detalle->unit_price;
-                $total += $subtotal;
-                return [
-                    'producto' => $detalle->producto->name ?? '—',
-                    'quantity' => $detalle->quantity,
-                    'unit_price' => $detalle->unit_price,
-                    'subtotal' => $subtotal,
-                ];
+        $cashDetails = $filteredSales
+            ->filter(fn (Venta $venta) => $venta->status !== 'cancelled')
+            ->filter(fn (Venta $venta) => $venta->normalized_payment_method === 'efectivo')
+            ->flatMap(function (Venta $venta) {
+                $statusMeta = $this->paymentStatusMeta($venta->payment_status);
+
+                return $venta->detalles->map(function ($detalle) use ($venta, $statusMeta) {
+                    return [
+                        'sale_id' => $venta->id,
+                        'customer' => $venta->customer->name ?? 'Cliente no registrado',
+                        'product' => $detalle->producto->name ?? 'Producto sin nombre',
+                        'quantity' => (float) $detalle->quantity,
+                        'unit' => $detalle->unit ?? '-',
+                        'payment_method' => [
+                            'value' => $venta->normalized_payment_method,
+                            'label' => $this->paymentMethodLabel($venta->normalized_payment_method),
+                        ],
+                        'payment_status' => [
+                            'value' => $venta->payment_status,
+                            'label' => $statusMeta['label'],
+                            'badge' => $statusMeta['badge'],
+                        ],
+                        'total' => round((float) $detalle->subtotal, 2),
+                        'amount_paid' => round((float) ($detalle->amount_paid ?? 0), 2),
+                        'pending' => round(max((float) ($detalle->difference ?? 0), 0), 2),
+                    ];
+                });
+            })
+            ->values()
+            ->map(function (array $detail, int $index) {
+                $detail['index'] = $index + 1;
+
+                return $detail;
             });
 
-            return response()->json([
-                'tipo' => 'sale',
-                'codigo' => $venta->codigo ?? '—',
-                'fecha' => $venta->created_at,
-                'customer' => $venta->customer->name ?? '—',
-                'user' => $venta->user->name ?? '—',
-                'detalles' => $detalles,
-                'total' => $total,
-            ]);
-        }
+        $history = $this->recentClosures($dateObj);
 
-        return response()->json(['error' => 'Tipo no válido para mostrar'], 400);
-    }
-
-    public function edit(string $id)
-    {
-    }
-
-    public function update(Request $request, string $id)
-    {
-    }
-
-
-    public function destroy(string $id)
-    {
-    }
-
-    public function exportInventory(Request $request)
-    {
-    $startDate = $request->input('start_date');
-    $endDate = $request->input('end_date');
-
-    $inventories = Inventory::with(['producto', 'user'])
-        ->when($startDate && $endDate, function ($q) use ($startDate, $endDate) {
-            $q->whereBetween('created_at', [
-                Carbon::parse($startDate)->startOfDay(),
-                Carbon::parse($endDate)->endOfDay()
-            ]);
-        })
-        ->whereNotNull('reference_id')
-        ->get()
-        ->groupBy(fn ($item) => $item->type . '_' . $item->reference_id)
-        ->map(function ($items) {
-            $first = $items->first();
-
-            $translatedType = match ($first->type) {
-                'sale' => 'Venta',
-                'purchase' => 'Compra',
-                'adjustment_purchase' => 'Ajuste de Compra (Anulada)',
-                'adjustment_sale' => 'Ajuste de Venta (Anulada)',
-                default => ucfirst($first->type),
-            };
-
-            return [
-                'reference_id' => $first->reference_id,
-                'type' => $translatedType,
-                'user' => $first->user->name ?? 'Sistema',
-                'created_at' => $first->created_at->format('d/m/Y H:i'),
-                'reason' => $first->reason ?? '-',
-                'productos' => $items->map(function ($i) {
-                    return $i->producto->name . ' (' . $i->quantity . ')';
-                })->implode(', '),
-                'total_products' => $items->count(), // ✅ ¡Este cuenta productos diferentes!
-            ];
-        })->values();
-
-       return Excel::download(new InventoryExport($inventories), 'inventario.xlsx');
-    }
-
-        public function exportInventoryId($reference_id, Request $request)
-    {
-    $inventario = Inventory::where('reference_id', $reference_id)
-        ->where('type', $request->input('type'))
-        ->first();
-
-    if (!$inventario) {
-        return back()->with('error', 'No se encontró inventario con ese ID');
-    }
-
-    $type = $inventario->type;
-    $translatedType = match ($type) {
-        'sale' => 'Venta',
-        'purchase' => 'Compra',
-        'adjustment_purchase' => 'Ajuste de Compra (Anulada)',
-        'adjustment_sale' => 'Ajuste de Venta (Anulada)',
-        default => ucfirst($type),
-    };
-
-    if ($type === 'purchase') {
-        $compra = Compra::with('detalles.producto', 'user')->find($reference_id);
-        if (!$compra) return back()->with('error', 'Compra no encontrada');
-
-        $total = 0;
-        $productos = $compra->detalles->map(function ($detalle) use (&$total) {
-        $subtotal = $detalle->quantity * $detalle->unit_cost;
-        $total += $subtotal;
-            return [
-                'Producto' => $detalle->producto->name ?? '—',
-                'Cantidad' => $detalle->quantity,
-                'Precio unitario' => $detalle->unit_cost,
-                'Subtotal' => $subtotal,
-            ];
-        });
-
-        $data = [
-            'reference_id' => $compra->codigo ?? '—',
-            'type' => $translatedType,
-            'user' => $compra->user->name ?? 'Sistema',
-            'created_at' => $compra->created_at->format('d/m/Y H:i'),
-            'reason' => $inventario->reason ?? '-',
-            'productos' => $productos,
-            'total' => $total,
+        return [
+            'summary' => $this->formatSummaryCards($globalSummary),
+            'filtered_summary' => $filteredSummary,
+            'details' => $cashDetails,
+            'history' => $history,
+            'meta' => [
+                'date' => $dateObj->toDateString(),
+                'date_display' => $dateObj->format('d/m/Y'),
+                'warehouse' => $warehouse,
+                'warehouse_label' => $warehouses[$warehouse] ?? ucfirst(str_replace('_', ' ', $warehouse)),
+            ],
         ];
-
-        return Excel::download(new InventoryExportId($data), "compra_ref_{$reference_id}.xlsx");
     }
 
-    if ($type === 'sale') {
-        $venta = Venta::with('detalles.producto', 'user')->find($reference_id);
-        if (!$venta) return back()->with('error', 'Venta no encontrada');
-
-        $total = 0;
-        $productos = $venta->detalles->map(function ($detalle) use (&$total) {
-        $subtotal = $detalle->quantity * $detalle->unit_price;
-        $total += $subtotal;
-            return [
-                'Producto' => $detalle->producto->name ?? '—',
-                'Cantidad' => $detalle->quantity,
-                'Precio unitario' => $detalle->unit_price,
-                'Subtotal' => $subtotal,
-            ];
-        });
-
-        $data = [
-            'reference_id' => $venta->codigo ?? '—',
-            'type' => $translatedType,
-            'user' => $venta->user->name ?? 'Sistema',
-            'created_at' => $venta->created_at->format('d/m/Y H:i'),
-            'reason' => $inventario->reason ?? '-',
-            'productos' => $productos,
-            'total' => $total,
-        ];
-
-        return Excel::download(new InventoryExportId($data), "venta_ref_{$reference_id}.xlsx");
-    }
-
-    return back()->with('error', 'Tipo de inventario no válido');
-    }
-
-    public function exportPdf($reference_id, Request $request)
+    private function recentClosures(Carbon $referenceDate): Collection
     {
-    $inventario = Inventory::where('reference_id', $reference_id)
-        ->where('type', $request->input('type'))
-        ->first();
+        $warehouses = $this->warehouses();
 
-    if (!$inventario) {
-        return back()->with('error', 'No se encontró inventario con ese ID');
+        return Venta::selectRaw("
+                DATE(sale_date) as date,
+                warehouse,
+                COUNT(*) FILTER (WHERE status != 'cancelled') as total_orders,
+                COUNT(*) FILTER (WHERE status != 'cancelled' AND payment_status = 'paid') as paid_orders,
+                COUNT(*) FILTER (WHERE status != 'cancelled' AND payment_status != 'paid') as pending_orders,
+                SUM(CASE WHEN status != 'cancelled' THEN amount_paid ELSE 0 END) as income_total,
+                SUM(CASE WHEN status != 'cancelled' AND difference > 0 THEN difference ELSE 0 END) as pending_amount
+            ")
+            ->whereDate('sale_date', '<=', $referenceDate->toDateString())
+            ->whereDate('sale_date', '>=', $referenceDate->copy()->subDays(14)->toDateString())
+            ->groupBy('date', 'warehouse')
+            ->orderByDesc('date')
+            ->orderBy('warehouse')
+            ->limit(10)
+            ->get()
+            ->map(function ($row) use ($warehouses) {
+                $date = Carbon::parse($row->date);
+
+                return [
+                    'date' => $date->toDateString(),
+                    'date_display' => $date->format('d/m/Y'),
+                    'warehouse' => $row->warehouse,
+                    'warehouse_label' => $warehouses[$row->warehouse] ?? ucfirst(str_replace('_', ' ', $row->warehouse)),
+                    'total_orders' => (int) $row->total_orders,
+                    'paid_orders' => (int) $row->paid_orders,
+                    'pending_orders' => (int) $row->pending_orders,
+                    'income_total' => round((float) $row->income_total, 2),
+                    'pending_amount' => round((float) $row->pending_amount, 2),
+                ];
+            });
     }
 
-    $type = $inventario->type;
-    $translatedType = match ($type) {
-        'sale' => 'Venta',
-        'purchase' => 'Compra',
-        'adjustment_purchase' => 'Ajuste de Compra (Anulada)',
-        'adjustment_sale' => 'Ajuste de Venta (Anulada)',
-        default => ucfirst($type),
-    };
-
-    if ($type === 'purchase') {
-        $compra = Compra::with('detalles.producto', 'user')->find($reference_id);
-        if (!$compra) return back()->with('error', 'Compra no encontrada');
-
-        $total = 0;
-        $productos = $compra->detalles->map(function ($detalle) use (&$total) {
-        $subtotal = $detalle->quantity * $detalle->unit_cost;
-        $total += $subtotal;
-            return [
-                'Producto' => $detalle->producto->name ?? '—',
-                'Cantidad' => $detalle->quantity,
-                'Precio unitario' => $detalle->unit_cost,
-                'Subtotal' => $subtotal,
-            ];
-        });
-        $qrBase64 = $this->generarQrBase64($compra->codigo);
-
-        $data = [
-            'reference_id' => $compra->codigo ?? '—',
-            'type' => $translatedType,
-            'user' => $compra->user->name ?? 'Sistema',
-            'created_at' => $compra->created_at->format('d/m/Y H:i'),
-            'reason' => $inventario->reason ?? '-',
-            'productos' => $productos,
-            'qr_code' => $qrBase64,
-            'total' => $total
-        ];
-
-        $pdf = PDF::loadView('pdf.inventario-id-pdf', compact('data'));
-        return $pdf->download("compra_ref_{$reference_id}.pdf");
-    }
-
-    if ($type === 'sale') {
-        $venta = Venta::with('detalles.producto', 'user')->find($reference_id);
-        if (!$venta) return back()->with('error', 'Venta no encontrada');
-
-        $total = 0;
-        $productos = $venta->detalles->map(function ($detalle) use (&$total) {
-        $subtotal = $detalle->quantity * $detalle->unit_price;
-        $total += $subtotal;
-            return [
-                'Producto' => $detalle->producto->name ?? '—',
-                'Cantidad' => $detalle->quantity,
-                'Precio unitario' => $detalle->unit_price,
-                'Subtotal' => $subtotal,
-            ];
-        });
-        $qrBase64 = $this->generarQrBase64($venta->codigo);
-        $data = [
-            'reference_id' => $venta->codigo ?? '—',
-            'type' => $translatedType,
-            'user' => $venta->user->name ?? 'Sistema',
-            'created_at' => $venta->created_at->format('d/m/Y H:i'),
-            'reason' => $inventario->reason ?? '-',
-            'productos' => $productos,
-            'qr_code' => $qrBase64,
-            'total' => $total
-        ];
-
-        $pdf = PDF::loadView('pdf.inventario-id-pdf', compact('data'));
-        return $pdf->download("venta_ref_{$reference_id}.pdf");
-    }
-
-    return back()->with('error', 'Tipo de inventario no válido');
-    }
-
-    private function generarQrBase64(string $codigo)
+    private function summarizeSales(Collection $sales): array
     {
-        $qrCode = new EndroidQrCode(
-            data: $codigo,
-            encoding: new Encoding('UTF-8'),
-            errorCorrectionLevel: ErrorCorrectionLevel::Low,
-            size: 100,
-            margin: 5
+        $validSales = $sales->filter(fn (Venta $venta) => $venta->status !== 'cancelled');
+        $cashSales = $validSales->filter(fn (Venta $venta) => $venta->normalized_payment_method === 'efectivo');
+
+        $pendingAmount = $validSales->reduce(
+            fn ($carry, Venta $venta) => $carry + max((float) $venta->difference, 0),
+            0.0
         );
 
-        $writer = new PngWriter();
-        $result = $writer->write($qrCode);
-        return 'data:image/png;base64,' . base64_encode($result->getString());
+        $totalOrders = $validSales->count();
+        $paidOrders = $validSales->where('payment_status', 'paid')->count();
+        $pendingOrders = $totalOrders - $paidOrders;
+
+        return [
+            'total_orders' => $totalOrders,
+            'paid_orders' => $paidOrders,
+            'pending_orders' => $pendingOrders,
+            'income_total' => round($validSales->sum('amount_paid'), 2),
+            'pending_amount' => round($pendingAmount, 2),
+            'income_cash' => round($cashSales->sum('amount_paid'), 2),
+        ];
+    }
+
+    private function formatSummaryCards(array $summary): array
+    {
+        return [
+            'cards' => [
+                [
+                    'label' => 'Total de Pedidos',
+                    'value' => $summary['total_orders'],
+                    'description' => 'Pedidos registrados en el dÃƒÂ­a',
+                ],
+                [
+                    'label' => 'Pedidos Pagados',
+                    'value' => $summary['paid_orders'],
+                    'description' => 'Pedidos completamente pagados',
+                ],
+                [
+                    'label' => 'Pedidos Pendientes',
+                    'value' => $summary['pending_orders'],
+                    'description' => 'Pedidos con saldo por cobrar',
+                ],
+                [
+                    'label' => 'Ingresos del DÃ­a',
+                    'value' => $summary['income_total'],
+                    'description' => 'Incluye todos los mÃ©todos de pago',
+                    'format' => 'currency',
+                    'extra' => [
+                        'cash' => $summary['income_cash'],
+                        'pending' => $summary['pending_amount'],
+                    ],
+                ],
+            ],
+            'raw' => $summary,
+        ];
+    }
+
+    private function normalizePaymentMethod(?string $method): ?string
+    {
+        if (!is_string($method)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($method));
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (in_array($normalized, array_keys($this->paymentMethodLabels()), true)) {
+            return $normalized;
+        }
+
+        $cleaned = str_replace('.', '', $normalized);
+        $cleaned = preg_replace('/\s+/', '_', $cleaned ?? '');
+
+        if (in_array($cleaned, array_keys($this->paymentMethodLabels()), true)) {
+            return $cleaned;
+        }
+
+        $legacy = [
+            'cash' => 'efectivo',
+            'card' => 'trans_bbva',
+            'transfer' => 'trans_bcp',
+        ];
+
+        return $legacy[$normalized] ?? $legacy[$cleaned] ?? null;
+    }
+
+    private function paymentMethodLabel(?string $method): string
+    {
+        $labels = $this->paymentMethodLabels();
+
+        if ($method && isset($labels[$method])) {
+            return $labels[$method];
+        }
+
+        return 'MÃƒÂ©todo desconocido';
+    }
+
+    private function paymentMethodLabels(): array
+    {
+        return [
+            'efectivo' => 'Efectivo',
+            'trans_bcp' => 'Trans. BCP',
+            'trans_bbva' => 'Trans. BBVA',
+            'yape' => 'Yape',
+            'plin' => 'Plin',
+        ];
+    }
+
+    private function paymentStatusMeta(?string $status): array
+    {
+        return match ($status) {
+            'paid' => ['label' => 'Pagado', 'badge' => 'badge bg-success'],
+            'to_collect' => ['label' => 'Saldo pendiente', 'badge' => 'badge bg-info text-dark'],
+            'change' => ['label' => 'Vuelto pendiente', 'badge' => 'badge bg-secondary'],
+            default => ['label' => 'Pendiente', 'badge' => 'badge bg-warning text-dark'],
+        };
+    }
+
+    private function warehouses(): array
+    {
+        return [
+            'curva' => 'AlmacÃƒÂ©n Curva',
+            'milla' => 'AlmacÃƒÂ©n Milla',
+            'santa_carolina' => 'AlmacÃƒÂ©n Santa Carolina',
+        ];
     }
 }

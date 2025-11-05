@@ -1,239 +1,223 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 
 axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]').content;
 
-$(document).ready(function () {
-    const table = $('#inventoryTable').DataTable({
-        processing: true,
-        serverSide: true,
-        ajax: {
-            url: '/inventories',
-            type: 'GET',
-            data: function (d) {
-                d.start_date = $('#start_date').val();
-                d.end_date = $('#end_date').val();
-            },
-            xhrFields: {
-                withCredentials: true
-            }
-        },
-        columns: [
-            { data: 'reference_id', name: 'reference_id', orderable: false, searchable: false },
-            { data: 'total_quantity', name: 'total_quantity' },
-            { data: 'type', name: 'type' },
-            { data: 'reason', name: 'reason' },
-            { data: 'user', name: 'user' },
-            { data: 'created_at', name: 'created_at' },
-            { data: 'acciones', name: 'acciones', orderable: false, searchable: false }
-        ],
-        language: {
-            url: '/assets/js/es-ES.json'
-        },
-        responsive: true,
-        autoWidth: false,
-        pageLength: 10,
-        order: [[0, 'desc']], // Orden por fecha
-        dom: 'Bfrtip',
-        buttons: [
-            {
-                extend: 'colvis',
-                text: 'Seleccionar Columnas',
-                className: 'btn btn-info',
-                postfixButtons: ['colvisRestore']
-            }
-        ]
-    });
-
-    function updateColvisStyles() {
-        $('.dt-button-collection .dt-button').each(function () {
-            const isActive = $(this).hasClass('active') || $(this).hasClass('dt-button-active');
-            if (isActive && $(this).find('.checkmark').length === 0) {
-                $(this).prepend('<span class="checkmark">✔</span>');
-            } else if (!isActive) {
-                $(this).find('.checkmark').remove();
-            }
-        });
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.querySelector('.container-fluid[data-fetch-url]');
+    if (!container) {
+        return;
     }
 
-    table.on('buttons-action', () => setTimeout(updateColvisStyles, 10));
-    $(document).on('click', '.buttons-colvis', () => setTimeout(updateColvisStyles, 50));
-    setTimeout(updateColvisStyles, 100);
+    const warehouseSelect = document.getElementById('warehouseSelect');
+    const dateInput = document.getElementById('closureDate');
+    const generateBtn = document.getElementById('generateClosureBtn');
+    const exportButtons = [document.getElementById('exportClosureBtn')].filter(Boolean);
+    const closureSubtitle = document.getElementById('closureSubtitle');
+    const summaryElements = {
+        total: document.getElementById('summary-total-orders'),
+        totalDesc: document.getElementById('summary-total-orders-desc'),
+        paid: document.getElementById('summary-paid-orders'),
+        paidDesc: document.getElementById('summary-paid-orders-desc'),
+        pending: document.getElementById('summary-pending-orders'),
+        pendingDesc: document.getElementById('summary-pending-orders-desc'),
+        income: document.getElementById('summary-income'),
+        incomeDesc: document.getElementById('summary-income-desc'),
+        incomeExtra: document.getElementById('summary-income-extra'),
+    };
+    const tableBody = document.getElementById('closureTableBody');
+    const emptyAlert = document.getElementById('closureTableEmpty');
+    const historyBody = document.getElementById('historyTableBody');
 
-    $('#filterBtn').on('click', function () {
-        table.ajax.reload();
-    });
+    const fetchUrl = container.dataset.fetchUrl;
+    const exportUrl = container.dataset.exportUrl;
 
-        $('#exportExcel').on('click', function (e) {
-        e.preventDefault();
+    if (container.dataset.defaultWarehouse && warehouseSelect) {
+        warehouseSelect.value = container.dataset.defaultWarehouse;
+    }
+    if (container.dataset.defaultDate && dateInput) {
+        dateInput.value = container.dataset.defaultDate;
+    }
 
-        const start = $('#start_date').val();
-        const end = $('#end_date').val();
-
-        if (!start || !end) {
-            Toastify({
-                text: "Coloca un intervalo de fecha.",
-                duration: 3000,
-                gravity: "top",
-                position: "right",
-                backgroundColor: "#dc3545"
-            }).showToast();
+    const setLoading = (isLoading) => {
+        if (!generateBtn) {
             return;
         }
 
-        const url = `/inventories/export?start_date=${start}&end_date=${end}`;
-        const filename = `reporte_inventarios_${start}_al_${end}.xlsx`;
-        showSpinner();
-        axios({
-            url: url,
-            method: 'GET',
-            responseType: 'blob' // 👈 necesario para archivos
-        })
-        .then(response => {
-            const blob = new Blob([response.data], { type: response.headers['content-type'] });
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(downloadUrl);
-            hideSpinner();
-        })
-        .catch(error => {
-            console.error("Error al exportar:", error);
-            hideSpinner();
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'No se pudo generar el archivo. Inténtalo de nuevo.'
-            });
+        generateBtn.disabled = isLoading;
+        generateBtn.innerHTML = isLoading
+            ? '<span class="spinner-border spinner-border-sm me-1"></span> Generando...'
+            : '<i class="ri-links-line me-1"></i> Generar Cierre';
+    };
+
+    const formatCurrency = (value) => {
+        const parsed = Number(value || 0);
+        return `S/ ${parsed.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const updateExportLinks = (params) => {
+        exportButtons.forEach((btn) => {
+            const url = new URL(exportUrl, window.location.origin);
+            url.searchParams.set('warehouse', params.warehouse);
+            url.searchParams.set('date', params.date);
+            btn.href = url.toString();
         });
-    });
+    };
 
+    const renderSummary = (summary, filteredSummary, meta) => {
+        if (!summaryElements.total) {
+            return;
+        }
 
-    // Ver detalle (dinámicamente renderizado en 'botones.blade.php')
-    $(document).on('click', '.btn-detalle', function () {
-        const referenceId = $(this).data('id');
-        const type = $(this).data('type');
+        summaryElements.total.textContent = summary.raw?.total_orders ?? 0;
+        summaryElements.totalDesc.textContent = summary.cards?.[0]?.description ?? '';
 
-        axios.get(`/inventories/${referenceId}?type=${type}`)
-            .then(response => {
-                const data = response.data;
+        summaryElements.paid.textContent = summary.raw?.paid_orders ?? 0;
+        summaryElements.paidDesc.textContent = summary.cards?.[1]?.description ?? '';
 
-                // Mostrar datos generales
-                $('#detalleId').text(`${data.codigo ?? '—'}`);
-                $('#detalleTipo').text(
-                    data.tipo === 'purchase' ? 'Compra' :
-                    data.tipo === 'sale' ? 'Venta' : 'Ajuste'
-                );
+        summaryElements.pending.textContent = summary.raw?.pending_orders ?? 0;
+        summaryElements.pendingDesc.textContent = summary.cards?.[2]?.description ?? '';
 
-                $('#detalleEntidad').text(
-                    data.tipo === 'purchase' ? data.supplier :
-                    data.tipo === 'sale' ? data.customer : '—'
-                );
+        const incomeValue = summary.raw?.income_total ?? 0;
+        summaryElements.income.textContent = formatCurrency(incomeValue);
+        summaryElements.incomeDesc.textContent = summary.cards?.[3]?.description ?? '';
 
-                $('#detalleFecha').text(
-                    new Date(data.fecha).toLocaleDateString('es-ES')
-                );
+        const cash = summary.raw?.income_cash ?? 0;
+        const pendingAmount = summary.raw?.pending_amount ?? 0;
+        summaryElements.incomeExtra.textContent = `Efectivo: ${formatCurrency(cash)} • Pendiente: ${formatCurrency(pendingAmount)}`;
 
-                $('#detalleUsuario').text(data.user ?? '—');
+        if (closureSubtitle) {
+            const warehouseLabel = meta.warehouse_label ?? '';
+            const dateLabel = meta.date_display ?? meta.date ?? '';
+            const filteredCash = filteredSummary ? formatCurrency(filteredSummary.income_cash ?? 0) : 'S/ 0.00';
+            closureSubtitle.textContent = `${warehouseLabel} · ${dateLabel} • Efectivo del almacén: ${filteredCash}`;
+        }
+    };
 
-                // Cargar tabla de productos
-                const detallesHtml = data.detalles.map(detalle => `
-                    <tr>
-                        <td>${detalle.producto}</td>
-                        <td>${detalle.quantity}</td>
-                        <td>${detalle.unit_price ?? '—'}</td>
-                        <td>${detalle.subtotal ?? '—'}</td>
-                    </tr>
-                `).join('');
+    const renderTable = (details) => {
+        if (!tableBody) {
+            return;
+        }
 
-                $('#detalleProductos').html(detallesHtml);
-                $('#detalleTotal').text(data.total.toFixed(2));
+        tableBody.innerHTML = '';
 
-                // Mostrar modal
-                const modal = new bootstrap.Modal(document.getElementById('detalleModal'));
-                modal.show();
-            })
-            .catch(() => {
-                Toastify({
-                    text: "No se pudieron cargar los detalles",
-                    duration: 3000,
-                    gravity: "top",
-                    position: "right",
-                    backgroundColor: "#dc3545"
-                }).showToast();
-            });
-    });
+        if (!details.length) {
+            emptyAlert?.classList.remove('d-none');
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 11;
+            cell.className = 'text-center text-muted py-4';
+            cell.textContent = 'No se registraron ventas en efectivo para los filtros seleccionados.';
+            row.appendChild(cell);
+            tableBody.appendChild(row);
+            return;
+        }
 
+        emptyAlert?.classList.add('d-none');
 
-
-    $(document).on('click', '.btn-export-pdf', function () {
-        const referenceId = $(this).data('id');
-        const type = $(this).data('type');
-        const url = `/inventories/${referenceId}/pdf?type=${type}`;
-        const filename = `inventario_${referenceId}.pdf`;
-
-        showSpinner();
-
-        axios({
-            url: url,
-            method: 'GET',
-            responseType: 'blob'
-        })
-        .then(response => {
-            const blob = new Blob([response.data], { type: 'application/pdf' });
-            const link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
-            window.URL.revokeObjectURL(link.href);
-            hideSpinner();
-        })
-        .catch(error => {
-            console.error('Error al descargar PDF:', error);
-            hideSpinner();
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'No se pudo descargar el PDF.'
-            });
+        details.forEach((detail) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${detail.index ?? ''}</td>
+                <td>${detail.customer ?? ''}</td>
+                <td>${detail.product ?? ''}</td>
+                <td>${detail.quantity ?? 0}</td>
+                <td>${detail.unit ?? ''}</td>
+                <td><span class="${detail.payment_status?.badge ?? 'badge bg-light text-dark'}">${detail.payment_status?.label ?? ''}</span></td>
+                <td>${detail.payment_method?.label ?? ''}</td>
+                <td>${formatCurrency(detail.total ?? 0)}</td>
+                <td>${formatCurrency(detail.amount_paid ?? 0)}</td>
+                <td>${formatCurrency(detail.pending ?? 0)}</td>
+            `;
+            tableBody.appendChild(row);
         });
-    });
+    };
 
-    $(document).on('click', '.btn-export-excel', function () {
-        const referenceId = $(this).data('id');
-        const type = $(this).data('type');
-        const url = `/inventories/export/${referenceId}?type=${type}`;
-        const filename = `inventario_${referenceId}.xlsx`;
+    const renderHistory = (items) => {
+        if (!historyBody) {
+            return;
+        }
 
-        showSpinner();
+        historyBody.innerHTML = '';
 
-        axios({
-            url: url,
-            method: 'GET',
-            responseType: 'blob'
-        })
-        .then(response => {
-            const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            const link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
-            window.URL.revokeObjectURL(link.href);
-            hideSpinner();
-        })
-        .catch(error => {
-            console.error('Error al descargar Excel:', error);
-            hideSpinner();
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'No se pudo descargar el archivo Excel.'
-            });
+        if (!items.length) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 7;
+            cell.className = 'text-center text-muted py-4';
+            cell.textContent = 'No hay datos para mostrar todavía.';
+            row.appendChild(cell);
+            historyBody.appendChild(row);
+            return;
+        }
+
+        items.forEach((item) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${item.date_display ?? item.date ?? ''}</td>
+                <td>${item.warehouse_label ?? item.warehouse ?? ''}</td>
+                <td>${item.total_orders ?? 0}</td>
+                <td class="text-success fw-semibold">${item.paid_orders ?? 0}</td>
+                <td class="text-warning fw-semibold">${item.pending_orders ?? 0}</td>
+                <td>${formatCurrency(item.income_total ?? 0)}</td>
+                <td>${formatCurrency(item.pending_amount ?? 0)}</td>
+            `;
+            historyBody.appendChild(row);
         });
+    };
+
+    const showError = (message) => {
+        const text = message || 'No se pudo obtener el cierre diario. Intenta nuevamente.';
+        if (window.Toastify) {
+            Toastify({
+                text,
+                duration: 4000,
+                gravity: 'top',
+                position: 'right',
+                style: { background: '#dc3545' },
+            }).showToast();
+        } else {
+            alert(text);
+        }
+    };
+
+    const loadClosure = async () => {
+        if (!warehouseSelect || !dateInput) {
+            return;
+        }
+
+        const params = {
+            warehouse: warehouseSelect.value,
+            date: dateInput.value,
+        };
+
+        updateExportLinks(params);
+        setLoading(true);
+
+        try {
+            const { data } = await axios.get(fetchUrl, { params });
+            renderSummary(data.summary, data.filtered_summary, data.meta);
+            renderTable(data.details ?? []);
+            renderHistory(data.history ?? []);
+        } catch (error) {
+            console.error(error);
+            showError(error?.response?.data?.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (generateBtn) {
+        generateBtn.addEventListener('click', loadClosure);
+    }
+
+    warehouseSelect?.addEventListener('change', () => {
+        updateExportLinks({ warehouse: warehouseSelect.value, date: dateInput.value });
     });
 
+    dateInput?.addEventListener('change', () => {
+        updateExportLinks({ warehouse: warehouseSelect.value, date: dateInput.value });
+    });
 
+    updateExportLinks({ warehouse: warehouseSelect?.value ?? '', date: dateInput?.value ?? '' });
+    loadClosure();
 });
