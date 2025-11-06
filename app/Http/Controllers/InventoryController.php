@@ -7,6 +7,7 @@ use App\Models\Venta;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -103,7 +104,7 @@ class InventoryController extends Controller
             ->values();
         $filteredSummary = $this->summarizeSales($filteredSales);
 
-        $cashDetails = $filteredSales
+        $detailRows = $filteredSales
             ->filter(fn (Venta $venta) => $venta->status !== 'cancelled')
             ->flatMap(function (Venta $venta) {
                 return $venta->detalles
@@ -111,10 +112,6 @@ class InventoryController extends Controller
                         $rawMethod = $detalle->payment_method ?? $venta->payment_method;
                         $normalizedMethod = $this->normalizePaymentMethod($rawMethod)
                             ?? $venta->normalized_payment_method;
-
-                        if ($normalizedMethod !== 'efectivo') {
-                            return null;
-                        }
 
                         $statusMeta = $this->paymentStatusMeta($detalle->payment_status);
 
@@ -136,9 +133,9 @@ class InventoryController extends Controller
                             'total' => round((float) $detalle->subtotal, 2),
                             'amount_paid' => round((float) ($detalle->amount_paid ?? 0), 2),
                             'pending' => round(max((float) ($detalle->difference ?? 0), 0), 2),
+                            'difference' => round((float) ($detalle->difference ?? 0), 2),
                         ];
                     })
-                    ->filter()
                     ->values();
             })
             ->values()
@@ -153,13 +150,14 @@ class InventoryController extends Controller
         return [
             'summary' => $this->formatSummaryCards($globalSummary),
             'filtered_summary' => $filteredSummary,
-            'details' => $cashDetails,
+            'details' => $detailRows,
             'history' => $history,
             'meta' => [
                 'date' => $dateObj->toDateString(),
                 'date_display' => $dateObj->format('d/m/Y'),
                 'warehouse' => $warehouse,
                 'warehouse_label' => $warehouses[$warehouse] ?? ucfirst(str_replace('_', ' ', $warehouse)),
+                'payment_method_labels' => $this->paymentMethodLabels(),
             ],
         ];
     }
@@ -167,25 +165,46 @@ class InventoryController extends Controller
     private function recentClosures(Carbon $referenceDate): Collection
     {
         $warehouses = $this->warehouses();
+        $endDate = $referenceDate->copy()->endOfDay()->toDateString();
+        $startDate = $referenceDate->copy()->subDays(14)->startOfDay()->toDateString();
 
-        return Venta::selectRaw("
-                DATE(sale_date) as date,
-                warehouse,
-                COUNT(*) FILTER (WHERE status != 'cancelled') as total_orders,
-                COUNT(*) FILTER (WHERE status != 'cancelled' AND payment_status = 'paid') as paid_orders,
-                COUNT(*) FILTER (WHERE status != 'cancelled' AND payment_status != 'paid') as pending_orders,
-                SUM(CASE WHEN status != 'cancelled' THEN amount_paid ELSE 0 END) as income_total,
-                SUM(CASE WHEN status != 'cancelled' AND difference > 0 THEN difference ELSE 0 END) as pending_amount
+        return DB::table('detalle_ventas as dv')
+            ->join('ventas as v', 'dv.sale_id', '=', 'v.id')
+            ->selectRaw("
+                DATE(v.sale_date) as date,
+                v.warehouse,
+                COUNT(*) FILTER (
+                    WHERE v.status != 'cancelled'
+                    AND COALESCE(dv.status, 'pending') != 'cancelled'
+                ) as total_orders,
+                SUM(
+                    CASE
+                        WHEN v.status != 'cancelled'
+                             AND COALESCE(dv.status, 'pending') != 'cancelled'
+                            THEN COALESCE(dv.amount_paid, 0)
+                        ELSE 0
+                    END
+                ) as income_total,
+                SUM(
+                    CASE
+                        WHEN v.status != 'cancelled'
+                             AND COALESCE(dv.status, 'pending') != 'cancelled'
+                             AND COALESCE(dv.difference, 0) > 0
+                            THEN COALESCE(dv.difference, 0)
+                        ELSE 0
+                    END
+                ) as pending_amount
             ")
-            ->whereDate('sale_date', '<=', $referenceDate->toDateString())
-            ->whereDate('sale_date', '>=', $referenceDate->copy()->subDays(14)->toDateString())
-            ->groupBy('date', 'warehouse')
+            ->whereBetween(DB::raw('DATE(v.sale_date)'), [$startDate, $endDate])
+            ->groupBy('date', 'v.warehouse')
             ->orderByDesc('date')
-            ->orderBy('warehouse')
+            ->orderBy('v.warehouse')
             ->limit(10)
             ->get()
             ->map(function ($row) use ($warehouses) {
                 $date = Carbon::parse($row->date);
+                $incomeTotal = (float) ($row->income_total ?? 0);
+                $pendingAmount = (float) ($row->pending_amount ?? 0);
 
                 return [
                     'date' => $date->toDateString(),
@@ -193,10 +212,9 @@ class InventoryController extends Controller
                     'warehouse' => $row->warehouse,
                     'warehouse_label' => $warehouses[$row->warehouse] ?? ucfirst(str_replace('_', ' ', $row->warehouse)),
                     'total_orders' => (int) $row->total_orders,
-                    'paid_orders' => (int) $row->paid_orders,
-                    'pending_orders' => (int) $row->pending_orders,
-                    'income_total' => round((float) $row->income_total, 2),
-                    'pending_amount' => round((float) $row->pending_amount, 2),
+                    'income_total' => round($incomeTotal, 2),
+                    'pending_amount' => round($pendingAmount, 2),
+                    'total_amount' => round($incomeTotal + $pendingAmount, 2),
                 ];
             });
     }
@@ -219,6 +237,7 @@ class InventoryController extends Controller
                             'status' => $detalle->payment_status,
                             'amount_paid' => (float) ($detalle->amount_paid ?? 0),
                             'difference' => (float) ($detalle->difference ?? 0),
+                            'subtotal' => (float) ($detalle->subtotal ?? 0),
                             'method' => $normalizedMethod,
                         ];
                     });
@@ -235,25 +254,50 @@ class InventoryController extends Controller
             $validDetails->reduce(fn ($carry, $detalle) => $carry + max($detalle['difference'], 0), 0.0),
             2
         );
-        $incomeCash = round(
-            $validDetails
-                ->filter(fn ($detalle) => $detalle['method'] === 'efectivo')
-                ->sum('amount_paid'),
-            2
-        );
 
-        $methodBreakdown = $validDetails
-            ->groupBy(fn ($detalle) => $detalle['method'] ?? null)
-            ->map(function (Collection $items, $method) {
+        $methodLabels = collect($this->paymentMethodLabels());
+        $methodCollected = $methodLabels->mapWithKeys(fn ($label, $key) => [$key => 0.0])->all();
+        $methodSales = $methodLabels->mapWithKeys(fn ($label, $key) => [$key => 0.0])->all();
+
+        foreach ($validDetails as $detalle) {
+            $method = $detalle['method'] ?? null;
+            if ($method !== null && array_key_exists($method, $methodCollected)) {
+                $methodCollected[$method] += (float) $detalle['amount_paid'];
+                $methodSales[$method] += (float) $detalle['subtotal'];
+            }
+        }
+
+        $methodCollected = array_map(fn ($value) => round($value, 2), $methodCollected);
+        $methodSales = array_map(fn ($value) => round($value, 2), $methodSales);
+
+        $incomeCash = round($methodCollected['efectivo'] ?? 0, 2);
+
+        $methodBreakdown = collect($methodCollected)
+            ->map(function ($amount, $method) use ($methodLabels) {
                 return [
                     'method' => $method,
-                    'label' => $this->paymentMethodLabel($method),
-                    'amount' => round($items->sum('amount_paid'), 2),
+                    'label' => $methodLabels[$method] ?? $this->paymentMethodLabel($method),
+                    'amount' => $amount,
                 ];
             })
+            ->filter(fn ($item) => $item['amount'] > 0)
             ->values()
             ->sortByDesc('amount')
             ->values();
+
+        $changeTotal = round(
+            $validDetails
+                ->filter(fn ($detalle) => $detalle['status'] === 'change')
+                ->reduce(fn ($carry, $detalle) => $carry + min($detalle['difference'] ?? 0, 0), 0.0),
+            2
+        );
+
+        $toCollectTotal = round(
+            $validDetails
+                ->filter(fn ($detalle) => $detalle['status'] === 'to_collect')
+                ->reduce(fn ($carry, $detalle) => $carry + max($detalle['difference'] ?? 0, 0), 0.0),
+            2
+        );
 
         return [
             'total_orders' => $totalOrders,
@@ -263,6 +307,10 @@ class InventoryController extends Controller
             'pending_amount' => $pendingAmount,
             'income_cash' => $incomeCash,
             'method_breakdown' => $methodBreakdown,
+            'method_collected_totals' => $methodCollected,
+            'method_sales_totals' => $methodSales,
+            'change_total' => $changeTotal,
+            'to_collect_total' => $toCollectTotal,
         ];
     }
 
@@ -373,4 +421,3 @@ class InventoryController extends Controller
         ];
     }
 }
-

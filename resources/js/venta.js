@@ -11,6 +11,11 @@ const amountPaidInput = document.getElementById('amount_paid');
 const paymentStatusSelect = document.getElementById('payment_status');
 const btnAgregarProducto = document.getElementById('addProductRow');
 const appTimezone = document.body?.dataset?.appTimezone || 'UTC';
+const userRole = (document.body?.dataset?.userRole || '').toLowerCase();
+const isAdminRole = userRole === 'administrador';
+const basePaymentStatuses = ['pending', 'paid'];
+const adminPaymentStatuses = ['pending', 'paid', 'to_collect', 'change', 'cancelled'];
+const availablePaymentStatuses = isAdminRole ? adminPaymentStatuses : basePaymentStatuses;
 let products = [];
 let detalleEditableDT = null;
 let isEditingVenta = false;
@@ -164,12 +169,27 @@ function formatDateForTimezone(date, timezone) {
     if (amountPaidInput) amountPaidInput.value = '0.00';
     if (paymentStatusSelect) {
         paymentStatusSelect.disabled = false;
-        paymentStatusSelect.value = 'pending';
-        Array.from(paymentStatusSelect.options).forEach(option => {
-            if (!['pending', 'paid'].includes(option.value)) {
-                option.remove();
-            }
-        });
+        if (!availablePaymentStatuses.includes(paymentStatusSelect.value)) {
+            paymentStatusSelect.value = 'pending';
+        }
+
+        if (!isAdminRole) {
+            Array.from(paymentStatusSelect.options).forEach(option => {
+                if (!basePaymentStatuses.includes(option.value)) {
+                    option.remove();
+                }
+            });
+        } else {
+            const existingValues = Array.from(paymentStatusSelect.options).map(option => option.value);
+            adminPaymentStatuses.forEach(status => {
+                if (!existingValues.includes(status)) {
+                    const option = document.createElement('option');
+                    option.value = status;
+                    option.textContent = paymentStatusText[status] ?? status;
+                    paymentStatusSelect.appendChild(option);
+                }
+            });
+        }
     }
 
     if (detalleEditableDT) {
@@ -542,11 +562,11 @@ function calcularTotal() {
     const paymentStatus = computePaymentStatus(total, amountPaid);
     if (paymentStatusSelect) {
         if (isEditingVenta) {
-            if (!['pending', 'paid'].includes(paymentStatusSelect.value)) {
+            if (!availablePaymentStatuses.includes(paymentStatusSelect.value)) {
                 paymentStatusSelect.value = 'pending';
             }
         } else {
-            if (!['pending', 'paid'].includes(paymentStatus)) {
+            if (!availablePaymentStatuses.includes(paymentStatus)) {
                 let option = paymentStatusSelect.querySelector(`option[value="${paymentStatus}"]`);
                 if (!option) {
                     option = document.createElement('option');
@@ -1061,7 +1081,7 @@ $(document).on('click', '.edit-btn', async function () {
             paymentStatusSelect.disabled = false;
             const currentStatus = venta.payment_status || 'pending';
 
-            if (!['pending', 'paid'].includes(currentStatus)) {
+            if (!availablePaymentStatuses.includes(currentStatus)) {
                 let option = paymentStatusSelect.querySelector(`option[value="${currentStatus}"]`);
                 if (!option) {
                     option = document.createElement('option');
@@ -1083,7 +1103,7 @@ $(document).on('click', '.edit-btn', async function () {
         if (Array.isArray(venta.detalle)) {
             let displayedCount = 0;
 
-            const validPaymentStatuses = ['pending', 'paid', 'to_collect', 'change', 'cancelled'];
+            const validPaymentStatuses = adminPaymentStatuses;
 
             venta.detalle.forEach(item => {
                 const paymentStatusNormalized = validPaymentStatuses.includes(item.payment_status)
@@ -1132,7 +1152,7 @@ $(document).on('click', '.edit-btn', async function () {
 
             if (paymentStatusSelect) {
                 paymentStatusSelect.disabled = false;
-                if (!['pending', 'paid'].includes(selectedDetailStatus)) {
+                if (!availablePaymentStatuses.includes(selectedDetailStatus)) {
                     let option = paymentStatusSelect.querySelector(`option[value="${selectedDetailStatus}"]`);
                     if (!option) {
                         option = document.createElement('option');

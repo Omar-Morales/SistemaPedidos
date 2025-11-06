@@ -2,6 +2,9 @@
 
 @section('title', 'Mantenimiento de Ventas')
 @section('content')
+@php
+    $isAdminRole = auth()->user()?->hasRole('Administrador');
+@endphp
     <div class="page-content">
         <div class="container-fluid">
 
@@ -131,13 +134,18 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4">
-                                <label class="form-label" for="payment_status">Estado de Pago</label>
-                                <select class="form-select" id="payment_status" name="payment_status" required>
-                                    <option value="pending" selected>Pendiente</option>
-                                    <option value="paid">Pagado</option>
-                                </select>
-                            </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="payment_status">Estado de Pago</label>
+                            <select class="form-select" id="payment_status" name="payment_status" required>
+                                <option value="pending" selected>Pendiente</option>
+                                @if ($isAdminRole)
+                                    <option value="to_collect">Saldo pendiente</option>
+                                    <option value="change">Vuelto pendiente</option>
+                                    <option value="cancelled">Anulado</option>
+                                @endif
+                                <option value="paid">Pagado</option>
+                            </select>
+                        </div>
 
                             <div class="col-md-4">
                                 <label for="total_price" class="form-label">Total</label>

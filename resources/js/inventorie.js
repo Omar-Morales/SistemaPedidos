@@ -80,10 +80,30 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryElements.income.textContent = formatCurrency(incomeValue);
         summaryElements.incomeDesc.textContent = summary.cards?.[3]?.description ?? '';
 
-        const cash = summary.raw?.income_cash ?? 0;
+        const methodTotals = summary.raw?.method_collected_totals ?? {};
+        const methodLabels = meta?.payment_method_labels ?? {};
         const pendingAmount = summary.raw?.pending_amount ?? 0;
-        summaryElements.incomeExtra.textContent = `Efectivo: ${formatCurrency(cash)} • Pendiente: ${formatCurrency(pendingAmount)}`;
+        const changeTotal = summary.raw?.change_total ?? 0;
 
+        const methodOrder = Object.keys(methodLabels);
+        const methodParts = methodOrder.length
+            ? methodOrder.map((method) => {
+                const label = methodLabels[method] ?? method;
+                const amount = methodTotals?.[method] ?? 0;
+                return `${label}: ${formatCurrency(amount)}`;
+            })
+            : Object.entries(methodTotals).map(([method, amount]) => `${method}: ${formatCurrency(amount)}`);
+
+        const extraParts = [];
+        if (methodParts.length) {
+            extraParts.push(methodParts.join(' • '));
+        }
+        extraParts.push(`Pendiente: ${formatCurrency(pendingAmount)}`);
+        if (changeTotal > 0) {
+            extraParts.push(`Vueltos: ${formatCurrency(changeTotal)}`);
+        }
+
+        summaryElements.incomeExtra.textContent = extraParts.join(' | ');
     };
 
     const renderTable = (details) => {
@@ -99,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const cell = document.createElement('td');
             cell.colSpan = 11;
             cell.className = 'text-center text-muted py-4';
-            cell.textContent = 'No se registraron ventas en efectivo para los filtros seleccionados.';
+            cell.textContent = 'No se registraron ventas para los filtros seleccionados.';
             row.appendChild(cell);
             tableBody.appendChild(row);
             return;
@@ -119,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${detail.payment_method?.label ?? ''}</td>
                 <td>${formatCurrency(detail.total ?? 0)}</td>
                 <td>${formatCurrency(detail.amount_paid ?? 0)}</td>
+                <td>${formatCurrency(detail.difference ?? 0)}</td>
                 <td>${formatCurrency(detail.pending ?? 0)}</td>
             `;
             tableBody.appendChild(row);
@@ -149,10 +170,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${item.date_display ?? item.date ?? ''}</td>
                 <td>${item.warehouse_label ?? item.warehouse ?? ''}</td>
                 <td>${item.total_orders ?? 0}</td>
-                <td class="text-success fw-semibold">${item.paid_orders ?? 0}</td>
-                <td class="text-warning fw-semibold">${item.pending_orders ?? 0}</td>
-                <td>${formatCurrency(item.income_total ?? 0)}</td>
                 <td>${formatCurrency(item.pending_amount ?? 0)}</td>
+                <td>${formatCurrency(item.income_total ?? 0)}</td>
+                <td>${formatCurrency(item.total_amount ?? 0)}</td>
             `;
             historyBody.appendChild(row);
         });

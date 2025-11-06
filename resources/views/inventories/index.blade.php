@@ -120,12 +120,13 @@
                                         <th>M&eacute;todo</th>
                                         <th>Total (S/)</th>
                                         <th>Pagado (S/)</th>
+                                        <th>Diferencia (S/)</th>
                                         <th>Pendiente (S/)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="closureTableBody">
                                     <tr>
-                                        <td colspan="10" class="text-center text-muted py-4">
+                                        <td colspan="11" class="text-center text-muted py-4">
                                             Selecciona filtros y genera el cierre para ver resultados.
                                         </td>
                                     </tr>
@@ -133,7 +134,7 @@
                             </table>
                         </div>
                         <div id="closureTableEmpty" class="alert alert-warning mt-3 d-none">
-                            No se registraron ventas en efectivo para los filtros seleccionados.
+                            No se registraron ventas para los filtros seleccionados.
                         </div>
                     </div>
                 </div>
@@ -155,10 +156,9 @@
                                         <th>Fecha</th>
                                         <th>Almac&eacute;n</th>
                                         <th>Total Pedidos</th>
-                                        <th>Pagados</th>
-                                        <th>Pendientes</th>
-                                        <th>Ingresos (S/)</th>
                                         <th>Por Cobrar (S/)</th>
+                                        <th>Ingresos (S/)</th>
+                                        <th>Total (S/)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="historyTableBody">
