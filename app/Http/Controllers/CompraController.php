@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 use App\Models\Compra;
 use App\Models\CompraLog;
 use App\Models\DetalleCompra;
-use App\Models\Transaction;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Supplier;
@@ -146,16 +145,6 @@ class CompraController extends Controller
         }
 
         // Registrar TRANSACTION
-        Transaction::create([
-            'type' => 'purchase',
-            'amount' => $total,
-            'reference_id' => $compra->id,
-            'description' => $compra->status === 'completed'
-                ? 'Compra ID: ' . $compra->id
-                : 'Compra pendiente ID: ' . $compra->id,
-            'user_id' => auth()->id(),
-        ]);
-
         // Log de auditoría
         $this->logCompra($compra->id, 'created', [], [
             'new_data' => $compra->toArray(),
@@ -314,13 +303,6 @@ public function update(Request $request, $id)
         }
 
         // 💰 Actualizar transacción contable
-        Transaction::where('reference_id', $compra->id)
-            ->where('type', 'purchase')
-            ->update([
-                'amount' => $total,
-                'description' => 'Compra ID: ' . $compra->id,
-            ]);
-
         // 📝 Registrar log
             $this->logCompra($compra->id, 'updated', [
                 'old_data' => $originalData,
@@ -503,13 +485,6 @@ public function update(Request $request, $id)
             $compra->total_cost = $total;
             $compra->save();
 
-            Transaction::where('reference_id', $compra->id)
-                ->where('type', 'purchase')
-                ->update([
-                    'amount' => $total,
-                    'description' => $nuevoStatus === 'pending' ? 'Compra pendiente ID: ' . $compra->id : 'Compra ID: ' . $compra->id,
-                ]);
-
             $this->logCompra($compra->id, 'updated', [
                 'old_data' => $originalData,
                 'old_details' => $detallesAnteriores->toArray(),
@@ -571,14 +546,6 @@ public function update(Request $request, $id)
 
             // Cambiar estado de la compra
             $compra->update(['status' => 'cancelled']);
-
-            // Actualizar la transacción relacionada
-            Transaction::where('reference_id', $compra->id)
-                ->where('type', 'purchase')
-                ->update([
-                    'description' => 'Compra anulada',
-                    'amount' => 0
-                ]);
 
             // Guardar en log
             $this->logCompra($compra->id, 'cancelled', [

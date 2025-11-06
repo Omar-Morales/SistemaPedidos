@@ -20,7 +20,7 @@
     @vite(['resources/js/app.js']) <!-- o @mix si usas Mix -->
 </head>
 
-<body>
+<body data-app-timezone="{{ config('app.timezone') }}">
     <!--<div id="preloader"></div>-->
     <!-- Begin page -->
     <div id="layout-wrapper">

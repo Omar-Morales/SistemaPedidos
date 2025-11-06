@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace Database\Seeders;
 
@@ -7,7 +7,6 @@ use App\Models\DetalleVenta;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\TipoDocumento;
-use App\Models\Transaction;
 use App\Models\Venta;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -97,13 +96,6 @@ class VentaSeeder extends Seeder
                     'difference' => 0,
                 ]);
 
-                Transaction::create([
-                    'type' => 'sale',
-                    'amount' => $totalPrice,
-                    'reference_id' => $venta->id,
-                    'description' => 'Venta entregada ID: ' . $venta->id,
-                    'user_id' => 1, // Ajustar segn el usuario administrador o de prueba
-                ]);
             }
 
             $this->command->info('Se generaron ventas de prueba con detalles.');

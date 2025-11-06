@@ -17,7 +17,6 @@ export default defineConfig({
                 'resources/js/compra.js',
                 'resources/js/venta.js',
                 'resources/js/inventorie.js',
-                'resources/js/transaction.js',
                 'resources/js/rol.js',
                 'resources/js/backup.js',
             ],

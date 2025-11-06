@@ -10,6 +10,7 @@ const saleDateInput = document.getElementById('sale_date');
 const amountPaidInput = document.getElementById('amount_paid');
 const paymentStatusSelect = document.getElementById('payment_status');
 const btnAgregarProducto = document.getElementById('addProductRow');
+const appTimezone = document.body?.dataset?.appTimezone || 'UTC';
 let products = [];
 let detalleEditableDT = null;
 let isEditingVenta = false;
@@ -145,9 +146,19 @@ function resetearModalVenta() {
     $delivery_type.val('').trigger('change');
     $warehouse.val('').trigger('change');
 
-    if (saleDateInput) {
-        saleDateInput.value = new Date().toISOString().slice(0, 10);
+if (saleDateInput) {
+        saleDateInput.value = formatDateForTimezone(new Date(), appTimezone);
     }
+
+function formatDateForTimezone(date, timezone) {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    });
+    return formatter.format(date);
+}
 
     if (totalInput) totalInput.value = '0.00';
     if (amountPaidInput) amountPaidInput.value = '0.00';
@@ -1166,7 +1177,7 @@ $(document).on('click', '.delete-btn', function () {
         showCancelButton: true,
         confirmButtonColor: '#d33',
         cancelButtonColor: '#3085d6',
-        confirmButtonText: 'S, eliminar',
+        confirmButtonText: 'Sí, eliminar',
         cancelButtonText: 'Cancelar'
     }).then((result) => {
         if (!result.isConfirmed) {

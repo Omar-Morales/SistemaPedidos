@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 
 use App\Models\Venta;
 use App\Models\Compra;
-use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 

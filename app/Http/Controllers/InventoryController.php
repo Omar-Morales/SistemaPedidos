@@ -81,6 +81,8 @@ class InventoryController extends Controller
                         'subtotal',
                         'amount_paid',
                         'difference',
+                        'payment_status',
+                        'payment_method',
                         'status',
                     ])->where('status', '!=', 'cancelled')
                       ->with(['producto:id,name']);
@@ -103,31 +105,41 @@ class InventoryController extends Controller
 
         $cashDetails = $filteredSales
             ->filter(fn (Venta $venta) => $venta->status !== 'cancelled')
-            ->filter(fn (Venta $venta) => $venta->normalized_payment_method === 'efectivo')
             ->flatMap(function (Venta $venta) {
-                $statusMeta = $this->paymentStatusMeta($venta->payment_status);
+                return $venta->detalles
+                    ->map(function ($detalle) use ($venta) {
+                        $rawMethod = $detalle->payment_method ?? $venta->payment_method;
+                        $normalizedMethod = $this->normalizePaymentMethod($rawMethod)
+                            ?? $venta->normalized_payment_method;
 
-                return $venta->detalles->map(function ($detalle) use ($venta, $statusMeta) {
-                    return [
-                        'sale_id' => $venta->id,
-                        'customer' => $venta->customer->name ?? 'Cliente no registrado',
-                        'product' => $detalle->producto->name ?? 'Producto sin nombre',
-                        'quantity' => (float) $detalle->quantity,
-                        'unit' => $detalle->unit ?? '-',
-                        'payment_method' => [
-                            'value' => $venta->normalized_payment_method,
-                            'label' => $this->paymentMethodLabel($venta->normalized_payment_method),
-                        ],
-                        'payment_status' => [
-                            'value' => $venta->payment_status,
-                            'label' => $statusMeta['label'],
-                            'badge' => $statusMeta['badge'],
-                        ],
-                        'total' => round((float) $detalle->subtotal, 2),
-                        'amount_paid' => round((float) ($detalle->amount_paid ?? 0), 2),
-                        'pending' => round(max((float) ($detalle->difference ?? 0), 0), 2),
-                    ];
-                });
+                        if ($normalizedMethod !== 'efectivo') {
+                            return null;
+                        }
+
+                        $statusMeta = $this->paymentStatusMeta($detalle->payment_status);
+
+                        return [
+                            'sale_id' => $venta->id,
+                            'customer' => $venta->customer->name ?? 'Cliente no registrado',
+                            'product' => $detalle->producto->name ?? 'Producto sin nombre',
+                            'quantity' => (float) $detalle->quantity,
+                            'unit' => $detalle->unit ?? '-',
+                            'payment_method' => [
+                                'value' => $normalizedMethod,
+                                'label' => $this->paymentMethodLabel($normalizedMethod),
+                            ],
+                            'payment_status' => [
+                                'value' => $detalle->payment_status,
+                                'label' => $statusMeta['label'],
+                                'badge' => $statusMeta['badge'],
+                            ],
+                            'total' => round((float) $detalle->subtotal, 2),
+                            'amount_paid' => round((float) ($detalle->amount_paid ?? 0), 2),
+                            'pending' => round(max((float) ($detalle->difference ?? 0), 0), 2),
+                        ];
+                    })
+                    ->filter()
+                    ->values();
             })
             ->values()
             ->map(function (array $detail, int $index) {
@@ -191,25 +203,66 @@ class InventoryController extends Controller
 
     private function summarizeSales(Collection $sales): array
     {
-        $validSales = $sales->filter(fn (Venta $venta) => $venta->status !== 'cancelled');
-        $cashSales = $validSales->filter(fn (Venta $venta) => $venta->normalized_payment_method === 'efectivo');
+        $validDetails = $sales
+            ->filter(fn (Venta $venta) => $venta->status !== 'cancelled')
+            ->flatMap(function (Venta $venta) {
+                $ventaMethod = $venta->normalized_payment_method
+                    ?? $this->normalizePaymentMethod($venta->payment_method);
 
-        $pendingAmount = $validSales->reduce(
-            fn ($carry, Venta $venta) => $carry + max((float) $venta->difference, 0),
-            0.0
+                return $venta->detalles
+                    ->filter(fn ($detalle) => ($detalle->status ?? null) !== 'cancelled')
+                    ->map(function ($detalle) use ($ventaMethod) {
+                        $rawMethod = $detalle->payment_method ?? null;
+                        $normalizedMethod = $this->normalizePaymentMethod($rawMethod) ?? $ventaMethod;
+
+                        return [
+                            'status' => $detalle->payment_status,
+                            'amount_paid' => (float) ($detalle->amount_paid ?? 0),
+                            'difference' => (float) ($detalle->difference ?? 0),
+                            'method' => $normalizedMethod,
+                        ];
+                    });
+            })
+            ->filter(fn ($detalle) => $detalle !== null)
+            ->values();
+
+        $totalOrders = $validDetails->count();
+        $paidOrders = $validDetails->filter(fn ($detalle) => $detalle['status'] === 'paid')->count();
+        $pendingOrders = $totalOrders - $paidOrders;
+
+        $incomeTotal = round($validDetails->sum('amount_paid'), 2);
+        $pendingAmount = round(
+            $validDetails->reduce(fn ($carry, $detalle) => $carry + max($detalle['difference'], 0), 0.0),
+            2
+        );
+        $incomeCash = round(
+            $validDetails
+                ->filter(fn ($detalle) => $detalle['method'] === 'efectivo')
+                ->sum('amount_paid'),
+            2
         );
 
-        $totalOrders = $validSales->count();
-        $paidOrders = $validSales->where('payment_status', 'paid')->count();
-        $pendingOrders = $totalOrders - $paidOrders;
+        $methodBreakdown = $validDetails
+            ->groupBy(fn ($detalle) => $detalle['method'] ?? null)
+            ->map(function (Collection $items, $method) {
+                return [
+                    'method' => $method,
+                    'label' => $this->paymentMethodLabel($method),
+                    'amount' => round($items->sum('amount_paid'), 2),
+                ];
+            })
+            ->values()
+            ->sortByDesc('amount')
+            ->values();
 
         return [
             'total_orders' => $totalOrders,
             'paid_orders' => $paidOrders,
             'pending_orders' => $pendingOrders,
-            'income_total' => round($validSales->sum('amount_paid'), 2),
-            'pending_amount' => round($pendingAmount, 2),
-            'income_cash' => round($cashSales->sum('amount_paid'), 2),
+            'income_total' => $incomeTotal,
+            'pending_amount' => $pendingAmount,
+            'income_cash' => $incomeCash,
+            'method_breakdown' => $methodBreakdown,
         ];
     }
 
@@ -218,24 +271,24 @@ class InventoryController extends Controller
         return [
             'cards' => [
                 [
-                    'label' => 'Total de Pedidos',
+                    'label' => 'Total de Productos',
                     'value' => $summary['total_orders'],
-                    'description' => 'Pedidos registrados en el dÃƒÂ­a',
+                    'description' => 'Productos registrados en el día',
                 ],
                 [
-                    'label' => 'Pedidos Pagados',
+                    'label' => 'Productos Pagados',
                     'value' => $summary['paid_orders'],
-                    'description' => 'Pedidos completamente pagados',
+                    'description' => 'Productos completamente pagados',
                 ],
                 [
-                    'label' => 'Pedidos Pendientes',
+                    'label' => 'Productos Pendientes',
                     'value' => $summary['pending_orders'],
-                    'description' => 'Pedidos con saldo por cobrar',
+                    'description' => 'Productos con saldo por cobrar',
                 ],
                 [
-                    'label' => 'Ingresos del DÃ­a',
+                    'label' => 'Ingresos del día',
                     'value' => $summary['income_total'],
-                    'description' => 'Incluye todos los mÃ©todos de pago',
+                    'description' => 'Incluye todos los métodos de pago',
                     'format' => 'currency',
                     'extra' => [
                         'cash' => $summary['income_cash'],
@@ -287,7 +340,7 @@ class InventoryController extends Controller
             return $labels[$method];
         }
 
-        return 'MÃƒÂ©todo desconocido';
+        return 'Método desconocido';
     }
 
     private function paymentMethodLabels(): array
@@ -314,9 +367,10 @@ class InventoryController extends Controller
     private function warehouses(): array
     {
         return [
-            'curva' => 'AlmacÃƒÂ©n Curva',
-            'milla' => 'AlmacÃƒÂ©n Milla',
-            'santa_carolina' => 'AlmacÃƒÂ©n Santa Carolina',
+            'curva' => 'Almacén Curva',
+            'milla' => 'Almacén Milla',
+            'santa_carolina' => 'Almacén Santa Carolina',
         ];
     }
 }
+

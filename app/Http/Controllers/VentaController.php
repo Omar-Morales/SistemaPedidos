@@ -7,7 +7,6 @@ use App\Models\DetalleVenta;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\TipoDocumento;
-use App\Models\Transaction;
 use App\Models\Venta;
 use App\Models\VentaLog;
 use Carbon\Carbon;
@@ -237,16 +236,6 @@ class VentaController extends Controller
     }
 
     private function inventoryReason(string $status, int $ventaId): string
-    {
-        return match ($status) {
-            'delivered' => 'Venta entregada ID: ' . $ventaId,
-            'in_progress' => 'Venta en curso ID: ' . $ventaId,
-            'cancelled' => 'Venta anulada ID: ' . $ventaId,
-            default => 'Venta pendiente ID: ' . $ventaId,
-        };
-    }
-
-    private function transactionDescription(string $status, int $ventaId): string
     {
         return match ($status) {
             'delivered' => 'Venta entregada ID: ' . $ventaId,
@@ -531,16 +520,6 @@ class VentaController extends Controller
                 }
             }
 
-            $transactionAmount = $statusVenta === 'cancelled' ? 0 : $total;
-
-            Transaction::create([
-                'type' => 'sale',
-                'amount' => $transactionAmount,
-                'reference_id' => $venta->id,
-                'description' => $this->transactionDescription($statusVenta, $venta->id),
-                'user_id' => auth()->id(),
-            ]);
-
             $this->logVenta($venta->id, 'created', [], [
                 'new_data' => $venta->toArray(),
                 'new_details' => $detalleCollection->toArray(),
@@ -822,13 +801,6 @@ class VentaController extends Controller
                 'codigo' => $request->input('codigo') ?? $venta->codigo,
             ]);
 
-            Transaction::where('reference_id', $venta->id)
-                ->where('type', 'sale')
-                ->update([
-                    'amount' => $statusVenta === 'cancelled' ? 0 : $total,
-                    'description' => $this->transactionDescription($statusVenta, $venta->id),
-                ]);
-
             $venta->refresh()->load('detalles');
 
             $this->logVenta($venta->id, 'updated', [
@@ -1048,13 +1020,6 @@ class VentaController extends Controller
 
                 $transactionAmount = $venta->status === 'cancelled' ? 0 : $venta->total_price;
 
-                Transaction::where('reference_id', $venta->id)
-                    ->where('type', 'sale')
-                    ->update([
-                        'amount' => $transactionAmount,
-                        'description' => $this->transactionDescription($venta->status, $venta->id),
-                    ]);
-
                 $detalle->refresh();
 
                 $this->logVenta($venta->id, 'detail_updated', [
@@ -1149,15 +1114,6 @@ class VentaController extends Controller
                 ]);
             }
 
-            $transactionAmount = $venta->status === 'cancelled' ? 0 : $venta->total_price;
-
-            Transaction::where('reference_id', $venta->id)
-                ->where('type', 'sale')
-                ->update([
-                    'amount' => $transactionAmount,
-                    'description' => $this->transactionDescription($venta->status, $venta->id),
-                ]);
-
             $this->logVenta($venta->id, 'detail_deleted', [
                 'deleted_detail' => $oldDetailData,
             ], [
@@ -1214,13 +1170,6 @@ class VentaController extends Controller
                 'amount_paid' => 0,
                 'difference' => $venta->total_price,
             ]);
-
-            Transaction::where('reference_id', $venta->id)
-                ->where('type', 'sale')
-                ->update([
-                    'description' => 'Venta anulada ID: ' . $venta->id,
-                    'amount' => 0,
-                ]);
 
             $venta->refresh()->load('detalles');
 

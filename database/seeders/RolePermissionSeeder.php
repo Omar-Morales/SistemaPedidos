@@ -53,10 +53,11 @@ class RolePermissionSeeder extends Seeder
             // Agrega más según necesites
         ]);
 
-        // Analista ve solo reportes o transacciones
+        // Analista ve solo reportes
         $analista = Role::where('name', 'Analista')->first();
         $analista?->syncPermissions([
-            'administrar.transacciones.index',
+            'administrar.inventarios.index',
+            'administrar.inventarios.export',
         ]);
 
         // Almacén puede ver inventario

@@ -12,7 +12,6 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\CompraController;
 use App\Http\Controllers\VentaController;
 use App\Http\Controllers\InventoryController;
-use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
@@ -78,11 +77,6 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/inventories/daily', [InventoryController::class, 'dailyClosure'])->name('inventories.daily');
     Route::get('/inventories/daily/export', [InventoryController::class, 'exportDailyClosure'])->name('inventories.daily.export');
     Route::resource('/inventories', InventoryController::class)->only(['index']);
-
-    Route::get('/transactions/export', [TransactionController::class, 'exportTransaction'])->name('transactions.export');
-    Route::get('/transactions/export/{reference_id}', [TransactionController::class, 'exportTransactionId'])->name('transactions.exportreference');
-    Route::get('/transactions/{reference_id}/pdf', [TransactionController::class, 'exportPdf'])->name('transactions.pdf');
-    Route::resource('/transactions', TransactionController::class);
 
     Route::get('/dashboard/data', [DashboardController::class, 'getDashboardData'])->name('dashboard.data');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

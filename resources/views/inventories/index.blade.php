@@ -30,7 +30,7 @@
                     <div class="card-body pb-2">
                         <div class="row g-3 align-items-end">
                             <div class="col-lg-4 col-md-6">
-                                <label for="warehouseSelect" class="form-label fw-semibold text-muted text-uppercase small">AlmacÃ©n</label>
+                                <label for="warehouseSelect" class="form-label fw-semibold text-muted text-uppercase small">Almac&eacute;n</label>
                                 <select class="form-select" id="warehouseSelect">
                                     @foreach($warehouses as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>
@@ -41,19 +41,21 @@
                                 <label for="closureDate" class="form-label fw-semibold text-muted text-uppercase small">Fecha</label>
                                 <input type="date" id="closureDate" class="form-control" value="{{ $defaultDate }}">
                             </div>
-                            <div class="col-lg-3 col-md-6 d-flex gap-2">
-                                <button id="generateClosureBtn" class="btn btn-primary w-100">
-                                    <i class="ri-links-line me-1"></i> Generar Cierre
-                                </button>
-                                @can('administrar.inventarios.export')
-                                    <a id="exportClosureBtn" href="#" class="btn btn-outline-success">
-                                        <i class="ri-download-2-line"></i>
-                                    </a>
-                                @endcan
-                            </div>
-                            <div class="col-lg-2 col-md-6 text-lg-end text-muted small">
-                                <strong>Detalle en efectivo</strong><br>
-                                <span id="closureSubtitle">Seleccione un almacÃ©n y fecha para ver el detalle.</span>
+                            <div class="col-lg-5 col-md-12">
+                                <div class="row g-2 ms-lg-auto">
+                                    <div class="col-12 col-lg-6">
+                                        <button id="generateClosureBtn" class="btn btn-primary w-100 py-2">
+                                            <i class="ri-links-line me-1"></i> Generar Cierre
+                                        </button>
+                                    </div>
+                                    @can('administrar.inventarios.export')
+                                        <div class="col-12 col-lg-6">
+                                            <a id="exportClosureBtn" href="#" class="btn btn-outline-success w-100 py-2 d-flex align-items-center justify-content-center gap-1">
+                                                <i class="ri-download-2-line"></i> Exportar Excel
+                                            </a>
+                                        </div>
+                                    @endcan
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -65,36 +67,36 @@
             <div class="col-xxl-3 col-md-6">
                 <div class="card mini-stats-wid h-100">
                     <div class="card-body">
-                        <p class="text-uppercase fw-semibold text-muted mb-2">Total de Pedidos</p>
+                        <p class="text-uppercase fw-semibold text-muted mb-2">Total de Productos</p>
                         <h4 class="fw-semibold mb-1" id="summary-total-orders">0</h4>
-                        <p class="text-muted mb-0 small" id="summary-total-orders-desc">Pedidos registrados en el díaa</p>
+                        <p class="text-muted mb-0 small" id="summary-total-orders-desc">Productos registrados en el d&iacute;a</p>
                     </div>
                 </div>
             </div>
             <div class="col-xxl-3 col-md-6">
                 <div class="card mini-stats-wid h-100">
                     <div class="card-body">
-                        <p class="text-uppercase fw-semibold text-muted mb-2">Pedidos Pagados</p>
+                        <p class="text-uppercase fw-semibold text-muted mb-2">Productos Pagados</p>
                         <h4 class="fw-semibold mb-1 text-success" id="summary-paid-orders">0</h4>
-                        <p class="text-muted mb-0 small" id="summary-paid-orders-desc">Pedidos completamente pagados</p>
+                        <p class="text-muted mb-0 small" id="summary-paid-orders-desc">Productos completamente pagados</p>
                     </div>
                 </div>
             </div>
             <div class="col-xxl-3 col-md-6">
                 <div class="card mini-stats-wid h-100">
                     <div class="card-body">
-                        <p class="text-uppercase fw-semibold text-muted mb-2">Pedidos Pendientes</p>
+                        <p class="text-uppercase fw-semibold text-muted mb-2">Productos Pendientes</p>
                         <h4 class="fw-semibold mb-1 text-warning" id="summary-pending-orders">0</h4>
-                        <p class="text-muted mb-0 small" id="summary-pending-orders-desc">Pedidos con saldo por cobrar</p>
+                        <p class="text-muted mb-0 small" id="summary-pending-orders-desc">Productos con saldo por cobrar</p>
                     </div>
                 </div>
             </div>
             <div class="col-xxl-3 col-md-6">
                 <div class="card mini-stats-wid h-100">
                     <div class="card-body">
-                        <p class="text-uppercase fw-semibold text-muted mb-2">Ingresos del DÃ­a</p>
+                        <p class="text-uppercase fw-semibold text-muted mb-2">Ingresos del d&iacute;a</p>
                         <h4 class="fw-semibold mb-1 text-primary" id="summary-income">S/ 0.00</h4>
-                        <p class="text-muted mb-0 small" id="summary-income-desc">Incluye todos los mÃ©todos de pago</p>
+                        <p class="text-muted mb-0 small" id="summary-income-desc">Incluye todos los m&eacute;todos de pago</p>
                         <div class="mt-2 small text-muted" id="summary-income-extra"></div>
                     </div>
                 </div>
@@ -115,7 +117,7 @@
                                         <th>Cantidad</th>
                                         <th>Unidad</th>
                                         <th>Estado de Pago</th>
-                                        <th>MÃ©todo</th>
+                                        <th>M&eacute;todo</th>
                                         <th>Total (S/)</th>
                                         <th>Pagado (S/)</th>
                                         <th>Pendiente (S/)</th>
@@ -143,7 +145,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h5 class="card-title mb-1">Cierres Recientes</h5>
-                        <p class="text-muted mb-0 small">Historial automÃ¡tico de cierres por fecha y almacÃ©n.</p>
+                        <p class="text-muted mb-0 small">Historial autom&aacute;tico de cierres por fecha y almac&eacute;n.</p>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -151,7 +153,7 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>Fecha</th>
-                                        <th>AlmacÃ©n</th>
+                                        <th>Almac&eacute;n</th>
                                         <th>Total Pedidos</th>
                                         <th>Pagados</th>
                                         <th>Pendientes</th>
@@ -162,7 +164,7 @@
                                 <tbody id="historyTableBody">
                                     <tr>
                                         <td colspan="7" class="text-center text-muted py-4">
-                                            No hay datos para mostrar todavÃ­a.
+                                            No hay datos para mostrar todav&iacute;a.
                                         </td>
                                     </tr>
                                 </tbody>

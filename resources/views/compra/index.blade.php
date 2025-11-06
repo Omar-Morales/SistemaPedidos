@@ -39,7 +39,7 @@
                                         <th>ID</th>
                                         <th>Proveedor</th>
                                         <th>Tipo Compra</th>
-                                        <th>Codido Compra</th>
+                                        <th>Codigo de Compra</th>
                                         <th>Usuario</th>
                                         <th>Fecha</th>
                                         <th>Total</th>
@@ -74,15 +74,21 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
+                    <div class="row g-3 mb-3">
+                        
+                        <div class="col-md-4">
+                            <label for="purchase_date" class="form-label">Fecha</label>
+                            <input type="date" class="form-control" id="purchase_date" name="purchase_date" required>
+                        </div>
+
+                        <div class="col-md-4">
                             <label for="supplier_id" class="form-label">Proveedor</label>
                             <select class="form-select" id="supplier_id" name="supplier_id" required>
                                 <option value="">-- Seleccione --</option>
                             </select>
                         </div>
 
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-4">
                             <label for="tipodocumento_id" class="form-label">Tipo Compra</label>
                             <select class="form-select" id="tipodocumento_id" name="tipodocumento_id" required>
                                 <option value="">-- Seleccione --</option>
@@ -92,17 +98,12 @@
                             </select>
                         </div>
 
-                        <div class="col-md-4 mb-3">
-                            <label for="codigo_numero" class="form-label">Nro Compra</label>
+                        <div class="col-md-4">
+                            <label for="codigo_numero" class="form-label">Código de Compra</label>
                             <input type="number" class="form-control" id="codigo_numero" name="codigo_numero" min="0" step="1">
                         </div>
 
-                        <div class="col-md-4 mb-3">
-                            <label for="purchase_date" class="form-label">Fecha</label>
-                            <input type="date" class="form-control" id="purchase_date" name="purchase_date" required>
-                        </div>
-
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-4">
                             <label for="status" class="form-label">Estado</label>
                             <select class="form-select" id="status" name="status" required>
                                 <option value="">-- Seleccione --</option>
@@ -111,16 +112,18 @@
                             </select>
                         </div>
 
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-4">
                         <label for="total_cost" class="form-label">Total</label>
                         <input type="number" class="form-control" id="total_cost" name="total_cost" required readonly>
                         </div>
                     </div>
 
                     <div class="mb-1">
-                        <h5>Productos</h5>
+                        <div class="d-flex align-items-center justify-content-between">
+                        <h5 class="mb-0">Productos</h5>
                         <button type="button" class="btn btn-sm btn-info mb-2" id="addProductRow">+ Agregar Producto</button>
-                        <div class="table-responsive">
+                        </div>
+                        <div class="table-responsive mt-2">
                             <table class="table table-bordered table-sm" id="detalleCompraTableEditable">
                                 <thead>
                                     <tr>

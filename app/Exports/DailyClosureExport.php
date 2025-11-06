@@ -38,7 +38,7 @@ class DailyClosureExport implements FromCollection, WithHeadings, WithMapping, S
             'Cantidad',
             'Unidad',
             'Estado de Pago',
-            'Método de Pago',
+            'Metodo de Pago',
             'Total (S/)',
             'Pagado (S/)',
             'Pendiente (S/)',
@@ -68,13 +68,13 @@ class DailyClosureExport implements FromCollection, WithHeadings, WithMapping, S
                 $sheet = $event->sheet->getDelegate();
 
                 $summaryStartRow = ($this->details->count() ?: 0) + 3;
-                $warehouse = $this->meta['warehouse_label'] ?? 'Almacén';
+                $warehouse = $this->meta['warehouse_label'] ?? 'Almacen';
                 $date = $this->meta['date_display'] ?? $this->meta['date'] ?? '';
 
                 $sheet->setCellValue("A{$summaryStartRow}", "Cierre Diario - {$warehouse}");
                 $sheet->setCellValue('A' . ($summaryStartRow + 1), "Fecha: {$date}");
 
-                $sheet->setCellValue('A' . ($summaryStartRow + 3), 'Total de productos:');
+                $sheet->setCellValue('A' . ($summaryStartRow + 3), 'Total de Productos:');
                 $sheet->setCellValue('B' . ($summaryStartRow + 3), $this->summary['total_orders'] ?? 0);
 
                 $sheet->setCellValue('A' . ($summaryStartRow + 4), 'Productos pagados:');
@@ -83,7 +83,7 @@ class DailyClosureExport implements FromCollection, WithHeadings, WithMapping, S
                 $sheet->setCellValue('A' . ($summaryStartRow + 5), 'Productos pendientes:');
                 $sheet->setCellValue('B' . ($summaryStartRow + 5), $this->summary['pending_orders'] ?? 0);
 
-                $sheet->setCellValue('A' . ($summaryStartRow + 6), 'Ingresos del día (todos los métodos):');
+                $sheet->setCellValue('A' . ($summaryStartRow + 6), 'Ingresos del dia (todos los metodos):');
                 $sheet->setCellValue('B' . ($summaryStartRow + 6), number_format($this->summary['income_total'] ?? 0, 2, '.', ''));
 
                 $sheet->setCellValue('A' . ($summaryStartRow + 7), 'Ingresos en efectivo:');
@@ -95,3 +95,4 @@ class DailyClosureExport implements FromCollection, WithHeadings, WithMapping, S
         ];
     }
 }
+

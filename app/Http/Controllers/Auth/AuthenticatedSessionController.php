@@ -40,7 +40,6 @@ class AuthenticatedSessionController extends Controller
         'administrar.compras.index' => 'compras.index',
         'administrar.ventas.index' => 'ventas.index',
         'administrar.inventarios.index' => 'inventories.index',
-        'administrar.transacciones.index' => 'transactions.index',
     ];
 
     foreach ($permissionsRoutes as $permission => $route) {

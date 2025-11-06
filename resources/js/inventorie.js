@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const dateInput = document.getElementById('closureDate');
     const generateBtn = document.getElementById('generateClosureBtn');
     const exportButtons = [document.getElementById('exportClosureBtn')].filter(Boolean);
-    const closureSubtitle = document.getElementById('closureSubtitle');
     const summaryElements = {
         total: document.getElementById('summary-total-orders'),
         totalDesc: document.getElementById('summary-total-orders-desc'),
@@ -63,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const renderSummary = (summary, filteredSummary, meta) => {
+    const renderSummary = (summary, meta) => {
         if (!summaryElements.total) {
             return;
         }
@@ -85,12 +84,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const pendingAmount = summary.raw?.pending_amount ?? 0;
         summaryElements.incomeExtra.textContent = `Efectivo: ${formatCurrency(cash)} • Pendiente: ${formatCurrency(pendingAmount)}`;
 
-        if (closureSubtitle) {
-            const warehouseLabel = meta.warehouse_label ?? '';
-            const dateLabel = meta.date_display ?? meta.date ?? '';
-            const filteredCash = filteredSummary ? formatCurrency(filteredSummary.income_cash ?? 0) : 'S/ 0.00';
-            closureSubtitle.textContent = `${warehouseLabel} · ${dateLabel} • Efectivo del almacén: ${filteredCash}`;
-        }
     };
 
     const renderTable = (details) => {
@@ -195,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const { data } = await axios.get(fetchUrl, { params });
-            renderSummary(data.summary, data.filtered_summary, data.meta);
+            renderSummary(data.summary, data.meta);
             renderTable(data.details ?? []);
             renderHistory(data.history ?? []);
         } catch (error) {

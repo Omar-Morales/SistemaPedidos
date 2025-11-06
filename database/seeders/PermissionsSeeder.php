@@ -64,9 +64,6 @@ $permissions = [
             ['name' => 'administrar.inventarios.index', 'description' => 'Ver listado de Inventarios'],
             ['name' => 'administrar.inventarios.export', 'description' => 'Exportar Inventario'],
 
-            // Transacciones
-            ['name' => 'administrar.transacciones.index', 'description' => 'Ver listado de Transacciones'],
-            ['name' => 'administrar.transacciones.export', 'description' => 'Exportar Transacciones'],
         ];
 
         foreach ($permissions as $permission) {

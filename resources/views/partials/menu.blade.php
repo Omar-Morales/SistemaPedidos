@@ -92,13 +92,6 @@
                     <li class="nav-item"><a class="nav-link menu-link" href="{{ route('inventories.index') }}"><i
                                 class="ri-calendar-check-line"></i> <span>Cierre Diario</span></a></li>
                 @endcan
-
-                {{-- <li class="menu-title"><span>Transaccion</span></li> --}}
-                @can('administrar.transacciones.index')
-                    <li class="nav-item"><a class="nav-link menu-link" href="{{ route('transactions.index') }}"><i
-                                class="ri-money-dollar-circle-line"></i> <span>Listado Transaccion</span></a></li>
-                @endcan
-
             </ul>
         </div>
     </div>
