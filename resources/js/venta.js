@@ -10,17 +10,53 @@ const saleDateInput = document.getElementById('sale_date');
 const amountPaidInput = document.getElementById('amount_paid');
 const paymentStatusSelect = document.getElementById('payment_status');
 const btnAgregarProducto = document.getElementById('addProductRow');
+const detailEditorPanel = document.getElementById('detailEditorPanel');
+const detailOrderStatusSelect = document.getElementById('detail_order_status');
+const detailAmountPaidInput = document.getElementById('detail_amount_paid');
 const appTimezone = document.body?.dataset?.appTimezone || 'UTC';
-const userRole = (document.body?.dataset?.userRole || '').toLowerCase();
-const isAdminRole = userRole === 'administrador';
+
+const rawRoleList = (document.body?.dataset?.userRoles || '')
+    .split(',')
+    .map(role => role.trim().toLowerCase())
+    .filter(role => role.length > 0);
+const primaryRole = (document.body?.dataset?.userRole || '').toLowerCase();
+if (primaryRole && !rawRoleList.includes(primaryRole)) {
+    rawRoleList.push(primaryRole);
+}
+const userRoles = rawRoleList;
+
+const warehouseRoleMap = {
+    curva: 'curva',
+    milla: 'milla',
+    'santa carolina': 'santa_carolina',
+};
+
+let restrictedWarehouse = null;
+for (const role of userRoles) {
+    if (warehouseRoleMap[role]) {
+        restrictedWarehouse = warehouseRoleMap[role];
+        break;
+    }
+}
+
+const rolesWithExtendedPaymentPrivileges = new Set(['administrador', 'curva', 'milla', 'santa carolina']);
+const hasExtendedPaymentPrivileges = userRoles.some(role => rolesWithExtendedPaymentPrivileges.has(role));
+const isSupervisorRole = userRoles.includes('supervisor');
+const isWarehouseRole = Boolean(restrictedWarehouse);
+
 const basePaymentStatuses = ['pending', 'paid'];
 const adminPaymentStatuses = ['pending', 'paid', 'to_collect', 'change', 'cancelled'];
-const availablePaymentStatuses = isAdminRole ? adminPaymentStatuses : basePaymentStatuses;
+const availablePaymentStatuses = hasExtendedPaymentPrivileges ? adminPaymentStatuses : basePaymentStatuses;
+const canUseDetailEditors = Boolean(detailEditorPanel) && hasExtendedPaymentPrivileges;
 let products = [];
 let detalleEditableDT = null;
 let isEditingVenta = false;
 let editingDetailId = null;
 let hiddenDetails = [];
+
+if (isWarehouseRole && btnAgregarProducto) {
+    btnAgregarProducto.classList.add('d-none');
+}
 
 /*
 function cargarProductos(callback) {
@@ -138,6 +174,11 @@ function normalizePaymentMethodValue(rawValue) {
     }
 });
 
+if (restrictedWarehouse) {
+    $warehouse.val(restrictedWarehouse).trigger('change');
+    $warehouse.prop('disabled', true);
+}
+
 function resetearModalVenta() {
     formVenta.reset();
     $('#venta_id').val('');
@@ -149,21 +190,28 @@ function resetearModalVenta() {
     $tipodocumento_id.val('').trigger('change');
     $payment_method.val('').trigger('change');
     $delivery_type.val('').trigger('change');
-    $warehouse.val('').trigger('change');
 
-if (saleDateInput) {
+    if (restrictedWarehouse) {
+        $warehouse.val(restrictedWarehouse).trigger('change');
+        $warehouse.prop('disabled', true);
+    } else {
+        $warehouse.prop('disabled', false);
+        $warehouse.val('').trigger('change');
+    }
+
+    if (saleDateInput) {
         saleDateInput.value = formatDateForTimezone(new Date(), appTimezone);
     }
 
-function formatDateForTimezone(date, timezone) {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    });
-    return formatter.format(date);
-}
+    if (detailEditorPanel) {
+        detailEditorPanel.classList.add('d-none');
+    }
+    if (detailOrderStatusSelect) {
+        detailOrderStatusSelect.value = 'pending';
+    }
+    if (detailAmountPaidInput) {
+        detailAmountPaidInput.value = '0.00';
+    }
 
     if (totalInput) totalInput.value = '0.00';
     if (amountPaidInput) amountPaidInput.value = '0.00';
@@ -173,14 +221,14 @@ function formatDateForTimezone(date, timezone) {
             paymentStatusSelect.value = 'pending';
         }
 
-        if (!isAdminRole) {
+        const existingValues = Array.from(paymentStatusSelect.options).map(option => option.value);
+        if (!hasExtendedPaymentPrivileges) {
             Array.from(paymentStatusSelect.options).forEach(option => {
                 if (!basePaymentStatuses.includes(option.value)) {
                     option.remove();
                 }
             });
         } else {
-            const existingValues = Array.from(paymentStatusSelect.options).map(option => option.value);
             adminPaymentStatuses.forEach(status => {
                 if (!existingValues.includes(status)) {
                     const option = document.createElement('option');
@@ -208,6 +256,16 @@ function formatDateForTimezone(date, timezone) {
     if (btnAgregarProducto) {
         btnAgregarProducto.disabled = false;
     }
+}
+
+function formatDateForTimezone(date, timezone) {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    });
+    return formatter.format(date);
 }
 
 function getHiddenFields(row) {
@@ -248,6 +306,81 @@ function syncGlobalSelectorsWithRow(row) {
             $('#payment_method').val(value).trigger('change');
         }
     }
+}
+
+function getActiveEditableRow() {
+    if (!detalleEditableDT) {
+        return null;
+    }
+    const nodes = detalleEditableDT.rows({ page: 'all' }).nodes().toArray();
+    return nodes.length ? nodes[0] : null;
+}
+
+function syncDetailEditorsFromRow() {
+    if (!canUseDetailEditors || !detailEditorPanel || !editingDetailId) {
+        return;
+    }
+
+    const activeRow = getActiveEditableRow();
+    if (!activeRow) {
+        detailEditorPanel.classList.add('d-none');
+        if (detailOrderStatusSelect) {
+            detailOrderStatusSelect.value = 'pending';
+        }
+        if (detailAmountPaidInput) {
+            detailAmountPaidInput.value = '0.00';
+        }
+        return;
+    }
+
+    detailEditorPanel.classList.remove('d-none');
+    const hidden = getHiddenFields(activeRow);
+
+    if (detailOrderStatusSelect && hidden.orderStatus) {
+        const currentStatus = hidden.orderStatus.value || 'pending';
+        detailOrderStatusSelect.value = currentStatus;
+    }
+
+    if (detailAmountPaidInput && hidden.amount) {
+        const amountValue = parseFloat(hidden.amount.value) || 0;
+        detailAmountPaidInput.value = amountValue.toFixed(2);
+    }
+}
+
+if (detailOrderStatusSelect) {
+    detailOrderStatusSelect.addEventListener('change', () => {
+        if (!canUseDetailEditors || !editingDetailId) return;
+        const activeRow = getActiveEditableRow();
+        if (!activeRow) return;
+        const hidden = getHiddenFields(activeRow);
+        if (hidden.orderStatus) {
+            hidden.orderStatus.value = detailOrderStatusSelect.value;
+        }
+    });
+}
+
+if (detailAmountPaidInput) {
+    detailAmountPaidInput.addEventListener('input', () => {
+        if (!canUseDetailEditors || !editingDetailId) return;
+        const activeRow = getActiveEditableRow();
+        if (!activeRow) return;
+
+        const hidden = getHiddenFields(activeRow);
+        if (!hidden) return;
+
+        const subtotalInput = activeRow.querySelector('.subtotal-input');
+        const subtotal = subtotalInput ? parseFloat(subtotalInput.value) || 0 : 0;
+        const amount = Math.max(0, parseFloat(detailAmountPaidInput.value) || 0);
+
+        if (hidden.amount) {
+            hidden.amount.value = amount.toFixed(2);
+        }
+        if (hidden.difference) {
+            hidden.difference.value = (subtotal - amount).toFixed(2);
+        }
+
+        calcularTotal();
+    });
 }
 
 /*************************para el seelct customer - cliente*************************************/
@@ -324,26 +457,35 @@ $('#modalVenta').on('hidden.bs.modal', function () {
     document.activeElement.blur();
 });
 
+const ventasTableColumns = [
+    { data: 'id', name: 'detalle_ventas.sale_id' },
+    { data: 'fecha', name: 'ventas.sale_date' },
+    { data: 'cliente', name: 'customers.name' },
+    { data: 'producto', name: 'products.name' },
+    { data: 'cantidad', name: 'detalle_ventas.quantity' },
+    { data: 'unidad', name: 'detalle_ventas.unit' },
+    { data: 'almacen', name: 'ventas.warehouse' },
+    { data: 'total', name: 'detalle_ventas.subtotal' },
+];
+
+if (!isSupervisorRole) {
+    ventasTableColumns.push({ data: 'monto_pagado', name: 'detalle_ventas.amount_paid' });
+}
+
+ventasTableColumns.push(
+    { data: 'diferencia', name: 'detalle_ventas.difference' },
+    { data: 'metodo_pago', name: 'ventas.payment_method' },
+    { data: 'estado_pago', name: 'detalle_ventas.payment_status' },
+    { data: 'estado_pedido', name: 'detalle_ventas.status' },
+);
+
+ventasTableColumns.push({ data: 'acciones', name: 'acciones', orderable: false, searchable: false });
+
 const table = $('#ventasTable').DataTable({
     processing: true,
     serverSide: true,
     ajax: '/ventas/data',
-    columns: [
-        { data: 'id', name: 'detalle_ventas.sale_id' },
-        { data: 'fecha', name: 'ventas.sale_date' },
-        { data: 'cliente', name: 'customers.name' },
-        { data: 'producto', name: 'products.name' },
-        { data: 'cantidad', name: 'detalle_ventas.quantity' },
-        { data: 'unidad', name: 'detalle_ventas.unit' },
-        { data: 'almacen', name: 'ventas.warehouse' },
-        { data: 'total', name: 'detalle_ventas.subtotal' },
-        { data: 'monto_pagado', name: 'detalle_ventas.amount_paid' },
-        { data: 'diferencia', name: 'detalle_ventas.difference' },
-        { data: 'metodo_pago', name: 'ventas.payment_method' },
-        { data: 'estado_pago', name: 'detalle_ventas.payment_status' },
-        { data: 'estado_pedido', name: 'detalle_ventas.status' },
-        { data: 'acciones', name: 'acciones', orderable: false, searchable: false }
-    ],
+    columns: ventasTableColumns,
     language: { url: '/assets/js/es-ES.json' },
     responsive: true,
     autoWidth: false,
@@ -578,6 +720,10 @@ function calcularTotal() {
             paymentStatusSelect.value = paymentStatus;
         }
     }
+
+    if (canUseDetailEditors && isEditingVenta) {
+        syncDetailEditorsFromRow();
+    }
 }
 
 const detailFieldSyncMap = {
@@ -620,60 +766,64 @@ if (paymentStatusSelect) {
             return;
         }
 
-        const selectedStatus = paymentStatusSelect.value || 'pending';
-        const enforcedStatus = selectedStatus === 'paid' ? 'paid' : 'pending';
+        let selectedStatus = paymentStatusSelect.value || 'pending';
+        if (!hasExtendedPaymentPrivileges && selectedStatus !== 'paid') {
+            selectedStatus = 'pending';
+            paymentStatusSelect.value = selectedStatus;
+        }
 
-        if (isEditingVenta) {
-            detalleEditableDT.rows().every(function () {
-                const row = this.node();
-                const hidden = getHiddenFields(row);
-                if (!hidden) return;
+        const forcePaid = selectedStatus === 'paid';
+        const forceCancelled = selectedStatus === 'cancelled';
+        const shouldForceAmount = forcePaid || forceCancelled;
 
-                if (hidden.paymentStatus) {
-                    hidden.paymentStatus.value = enforcedStatus;
-                }
+        detalleEditableDT.rows().every(function () {
+            const row = this.node();
+            const hidden = getHiddenFields(row);
+            if (!hidden) return;
 
-                const subtotalInput = row?.querySelector('.subtotal-input');
-                const subtotal = subtotalInput ? parseFloat(subtotalInput.value) || 0 : 0;
-                const amount = enforcedStatus === 'paid' ? subtotal : 0;
+            if (hidden.paymentStatus) {
+                hidden.paymentStatus.value = selectedStatus;
+            }
 
-                if (hidden.amount) {
-                    hidden.amount.value = amount.toFixed(2);
-                }
-                if (hidden.difference) {
-                    hidden.difference.value = (subtotal - amount).toFixed(2);
-                }
-            });
-        } else {
-            detalleEditableDT.rows().every(function () {
-                const row = this.node();
-                const subtotalInput = row?.querySelector('.subtotal-input');
-                const subtotal = subtotalInput ? parseFloat(subtotalInput.value) || 0 : 0;
-                const hidden = getHiddenFields(row);
+            const subtotalInput = row?.querySelector('.subtotal-input');
+            const subtotal = subtotalInput ? parseFloat(subtotalInput.value) || 0 : 0;
 
-                if (hidden.paymentStatus) {
-                    hidden.paymentStatus.value = enforcedStatus;
-                }
-
-                if (hidden.amount) {
-                    const amount = enforcedStatus === 'paid' ? subtotal : 0;
-                    hidden.amount.value = amount.toFixed(2);
+            if (hidden.amount) {
+                if (shouldForceAmount) {
+                    const enforcedAmount = forcePaid ? subtotal : 0;
+                    hidden.amount.value = enforcedAmount.toFixed(2);
                     if (hidden.difference) {
-                        hidden.difference.value = (subtotal - amount).toFixed(2);
+                        hidden.difference.value = (subtotal - enforcedAmount).toFixed(2);
                     }
+                } else if (hidden.difference) {
+                    const currentAmount = parseFloat(hidden.amount.value) || 0;
+                    hidden.difference.value = (subtotal - currentAmount).toFixed(2);
                 }
-            });
+            }
+        });
 
-            hiddenDetails = hiddenDetails.map(detail => {
-                const subtotal = parseFloat(detail.subtotal) || 0;
-                const amount = enforcedStatus === 'paid' ? subtotal : 0;
+        hiddenDetails = hiddenDetails.map(detail => {
+            const subtotal = parseFloat(detail.subtotal) || 0;
+            if (shouldForceAmount) {
+                const enforcedAmount = forcePaid ? subtotal : 0;
                 return {
                     ...detail,
-                    payment_status: enforcedStatus,
-                    amount_paid: amount.toFixed(2),
-                    difference: (subtotal - amount).toFixed(2),
+                    payment_status: selectedStatus,
+                    amount_paid: enforcedAmount,
+                    difference: subtotal - enforcedAmount,
                 };
-            });
+            }
+
+            const currentAmount = parseFloat(detail.amount_paid) || 0;
+            return {
+                ...detail,
+                payment_status: selectedStatus,
+                difference: subtotal - currentAmount,
+            };
+        });
+
+        if (canUseDetailEditors) {
+            syncDetailEditorsFromRow();
         }
 
         calcularTotal();
@@ -808,6 +958,9 @@ function agregarFilaProducto(data = {}) {
     }
 
     calcularTotal();
+    if (isEditingVenta && canUseDetailEditors) {
+        syncDetailEditorsFromRow();
+    }
 }
 
 btnAgregarProducto?.addEventListener('click', agregarFilaProducto);

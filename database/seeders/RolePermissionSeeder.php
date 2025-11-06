@@ -65,5 +65,19 @@ class RolePermissionSeeder extends Seeder
         $almacen?->syncPermissions([
             'administrar.inventarios.index',
         ]);
+
+        $warehouseRoles = [
+            'Curva',
+            'Milla',
+            'Santa Carolina',
+        ];
+
+        foreach ($warehouseRoles as $roleName) {
+            $role = Role::where('name', $roleName)->first();
+            $role?->syncPermissions([
+                'administrar.ventas.index',
+                'administrar.ventas.edit',
+            ]);
+        }
     }
 }

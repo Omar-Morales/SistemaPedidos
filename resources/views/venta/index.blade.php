@@ -3,7 +3,13 @@
 @section('title', 'Mantenimiento de Ventas')
 @section('content')
 @php
-    $isAdminRole = auth()->user()?->hasRole('Administrador');
+    $user = auth()->user();
+    $roleNames = $user ? $user->getRoleNames() : collect();
+    $warehouseRoleNames = collect(['Curva', 'Milla', 'Santa Carolina']);
+    $isSupervisorRole = $roleNames->contains('Supervisor');
+    $isWarehouseRole = $roleNames->intersect($warehouseRoleNames)->isNotEmpty();
+    $rolesWithPaymentPrivileges = collect(['Administrador'])->merge($warehouseRoleNames);
+    $canManagePaymentStatuses = $roleNames->intersect($rolesWithPaymentPrivileges)->isNotEmpty();
 @endphp
     <div class="page-content">
         <div class="container-fluid">
@@ -48,7 +54,9 @@
                                             <th>Unidad</th>
                                             <th>Almacen</th>
                                             <th>Total</th>
-                                            <th>Monto Pagado</th>
+                                            @unless ($isSupervisorRole)
+                                                <th>Monto Pagado</th>
+                                            @endunless
                                             <th>Diferencia</th>
                                             <th>Metodo de Pago</th>
                                             <th>Estado de Pago</th>
@@ -80,20 +88,20 @@
                     </div>
                     <div class="modal-body">
                         <div class="row g-3 mb-3">
-                            <div class="col-md-4">
+                            <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
                                 <label for="sale_date" class="form-label">Fecha</label>
                                 <input type="date" class="form-control" id="sale_date" name="sale_date"
                                     value="{{ \Carbon\Carbon::today(config('app.timezone'))->format('Y-m-d') }}" required>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
                                 <label for="customer_id" class="form-label">Cliente</label>
                                 <select class="form-select" id="customer_id" name="customer_id" required>
                                     <option value="">-- Seleccione --</option>
                                 </select>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
                                 <label for="tipodocumento_id" class="form-label">Tipo Documento</label>
                                 <select class="form-select" id="tipodocumento_id" name="tipodocumento_id" required>
                                     <option value="">-- Seleccione --</option>
@@ -115,7 +123,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
                                 <label for="delivery_type" class="form-label">Tipo de Entrega</label>
                                 <select class="form-select" id="delivery_type" name="delivery_type" required>
                                     <option value="">-- Seleccione --</option>
@@ -124,7 +132,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
                                 <label for="warehouse" class="form-label">Almacen</label>
                                 <select class="form-select" id="warehouse" name="warehouse" required>
                                     <option value="">-- Seleccione --</option>
@@ -134,11 +142,11 @@
                                 </select>
                             </div>
 
-                        <div class="col-md-4">
+                        <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
                             <label class="form-label" for="payment_status">Estado de Pago</label>
                             <select class="form-select" id="payment_status" name="payment_status" required>
                                 <option value="pending" selected>Pendiente</option>
-                                @if ($isAdminRole)
+                                @if ($canManagePaymentStatuses)
                                     <option value="to_collect">Saldo pendiente</option>
                                     <option value="change">Vuelto pendiente</option>
                                     <option value="cancelled">Anulado</option>
@@ -147,7 +155,7 @@
                             </select>
                         </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
                                 <label for="total_price" class="form-label">Total</label>
                                 <input type="number" step="0.01" class="form-control" id="total_price"
                                     name="total_price" value="0.00" readonly>
@@ -158,6 +166,24 @@
                         <input type="hidden" id="status" name="status" value="pending">
 
                         <input type="hidden" id="amount_paid" name="amount_paid" value="0.00">
+
+                        @if ($canManagePaymentStatuses)
+                            <div class="row g-3 mb-3 d-none" id="detailEditorPanel">
+                                <div class="col-md-6">
+                                    <label for="detail_order_status" class="form-label">Estado de Pedido</label>
+                                    <select class="form-select" id="detail_order_status">
+                                        <option value="pending">Pendiente</option>
+                                        <option value="in_progress">En curso</option>
+                                        <option value="delivered">Entregado</option>
+                                        <option value="cancelled">Anulado</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="detail_amount_paid" class="form-label">Monto Pagado</label>
+                                    <input type="number" step="0.01" min="0" class="form-control" id="detail_amount_paid" value="0.00">
+                                </div>
+                            </div>
+                        @endif
 
                         <div class="mb-1">
                             <div class="d-flex align-items-center justify-content-between">

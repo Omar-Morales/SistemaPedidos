@@ -20,7 +20,15 @@
     @vite(['resources/js/app.js']) <!-- o @mix si usas Mix -->
 </head>
 
-<body data-app-timezone="{{ config('app.timezone') }}" data-user-role="{{ optional(auth()->user()->role)->name }}">
+@php
+    $authUser = auth()->user();
+    $roleNames = $authUser ? $authUser->getRoleNames() : collect();
+    $primaryRoleName = $roleNames->first();
+    $roleListAttr = $roleNames->implode(',');
+@endphp
+<body data-app-timezone="{{ config('app.timezone') }}"
+    data-user-role="{{ $primaryRoleName }}"
+    data-user-roles="{{ $roleListAttr }}">
     <!--<div id="preloader"></div>-->
     <!-- Begin page -->
     <div id="layout-wrapper">

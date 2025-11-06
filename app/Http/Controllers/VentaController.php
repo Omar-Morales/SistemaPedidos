@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Yajra\DataTables\Facades\DataTables;
+use Illuminate\Support\Str;
 
 class VentaController extends Controller
 {
@@ -148,6 +149,55 @@ class VentaController extends Controller
         'card' => 'trans_bbva',
         'transfer' => 'trans_bcp',
     ];
+
+    private function resolveWarehouseScopeForUser($user): ?string
+    {
+        if (!$user || !method_exists($user, 'getRoleNames')) {
+            return null;
+        }
+
+        $roleWarehouseMap = [
+            'curva' => 'curva',
+            'milla' => 'milla',
+            'santa carolina' => 'santa_carolina',
+        ];
+
+        foreach ($user->getRoleNames() as $roleName) {
+            $normalized = Str::of($roleName)->lower()->value();
+            if (isset($roleWarehouseMap[$normalized])) {
+                return $roleWarehouseMap[$normalized];
+            }
+        }
+
+        return null;
+    }
+
+    private function filterDetallesByWarehouse(Venta $venta, ?string $restrictedWarehouse): Collection
+    {
+        if (!$restrictedWarehouse) {
+            return $venta->detalles;
+        }
+
+        return $venta->detalles
+            ->filter(function (DetalleVenta $detalle) use ($venta, $restrictedWarehouse) {
+                $detalleWarehouse = strtolower(trim((string) ($detalle->warehouse ?? $venta->warehouse)));
+                return $detalleWarehouse === $restrictedWarehouse;
+            })
+            ->values();
+    }
+
+    private function assertCanManageDetalle(DetalleVenta $detalle): void
+    {
+        $restrictedWarehouse = $this->resolveWarehouseScopeForUser(Auth::user());
+        if (!$restrictedWarehouse) {
+            return;
+        }
+
+        $detalleWarehouse = strtolower(trim((string) ($detalle->warehouse ?? optional($detalle->venta)->warehouse)));
+        if ($detalleWarehouse !== $restrictedWarehouse) {
+            abort(403, 'No tienes permiso para administrar este producto.');
+        }
+    }
 
     private function validPaymentMethods(): array
     {
@@ -542,6 +592,15 @@ class VentaController extends Controller
     {
         $venta = Venta::with(['detalles'])->findOrFail($id);
 
+        $restrictedWarehouse = $this->resolveWarehouseScopeForUser(Auth::user());
+        if ($restrictedWarehouse) {
+            $filteredDetalles = $this->filterDetallesByWarehouse($venta, $restrictedWarehouse);
+            if ($filteredDetalles->isEmpty()) {
+                abort(403, 'No tienes permiso para ver esta venta.');
+            }
+            $venta->setRelation('detalles', $filteredDetalles);
+        }
+
         $clientesQuery = Customer::query()
             ->select('id', 'name', 'status')
             ->where('status', 'active');
@@ -819,6 +878,8 @@ class VentaController extends Controller
     {
         $detalle = DetalleVenta::with(['venta.detalles', 'producto'])->findOrFail($detailId);
         $venta = $detalle->venta;
+        $this->assertCanManageDetalle($detalle);
+        $restrictedWarehouse = $this->resolveWarehouseScopeForUser(Auth::user());
 
         $request->validate([
             'customer_id' => 'required|exists:customers,id',
@@ -871,7 +932,7 @@ class VentaController extends Controller
         }
         $difference = round($subtotal - $amountPaid, 2);
         $unitPrice = $quantity > 0 ? round($subtotal / $quantity, 4) : 0;
-        $warehouseDetalle = $detailInput['warehouse'] ?? $detalle->warehouse ?? $venta->warehouse;
+        $warehouseDetalle = strtolower(trim((string) ($detailInput['warehouse'] ?? $detalle->warehouse ?? $venta->warehouse)));
         $deliveryDetalle = $detailInput['delivery_type'] ?? $detalle->delivery_type ?? $venta->delivery_type;
         $paymentMethodDetalle = $detailInput['payment_method']
             ?? $this->normalizePaymentMethod($detalle->payment_method)
@@ -879,6 +940,10 @@ class VentaController extends Controller
 
         if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
             return response()->json(['message' => 'Almacen invalido para el detalle.'], 422);
+        }
+
+        if ($restrictedWarehouse && $warehouseDetalle !== $restrictedWarehouse) {
+            return response()->json(['message' => 'No tienes permiso para asignar este detalle a otro almacén.'], 403);
         }
 
         if (!in_array($deliveryDetalle, ['pickup', 'delivery'], true)) {
@@ -1056,6 +1121,7 @@ class VentaController extends Controller
     {
         $detalle = DetalleVenta::with(['venta.detalles', 'producto'])->findOrFail($detailId);
         $venta = $detalle->venta;
+        $this->assertCanManageDetalle($detalle);
 
         $oldDetailData = $detalle->toArray();
 
@@ -1129,6 +1195,21 @@ class VentaController extends Controller
     public function destroy($id)
     {
         $venta = Venta::with('detalles.producto')->findOrFail($id);
+        $restrictedWarehouse = $this->resolveWarehouseScopeForUser(Auth::user());
+
+        if ($restrictedWarehouse) {
+            $totalDetalles = $venta->detalles->count();
+            $permitidos = $venta->detalles
+                ->filter(function (DetalleVenta $detalle) use ($venta, $restrictedWarehouse) {
+                    $detalleWarehouse = strtolower(trim((string) ($detalle->warehouse ?? $venta->warehouse)));
+                    return $detalleWarehouse === $restrictedWarehouse;
+                })
+                ->count();
+
+            if ($permitidos === 0 || $permitidos !== $totalDetalles) {
+                abort(403, 'No tienes permiso para anular esta venta.');
+            }
+        }
 
         if ($venta->status === 'cancelled') {
             return response()->json(['message' => 'Esta venta ya fue anulada.'], 400);
@@ -1217,6 +1298,17 @@ class VentaController extends Controller
             ->leftJoin('products', 'products.id', '=', 'detalle_ventas.product_id');
 
         $currentUser = Auth::user();
+        $restrictedWarehouse = $this->resolveWarehouseScopeForUser($currentUser);
+
+        if ($restrictedWarehouse) {
+            $detalles->where(function ($query) use ($restrictedWarehouse) {
+                $query->whereRaw('LOWER(detalle_ventas.warehouse) = ?', [$restrictedWarehouse])
+                    ->orWhere(function ($subQuery) use ($restrictedWarehouse) {
+                        $subQuery->whereNull('detalle_ventas.warehouse')
+                            ->whereRaw('LOWER(ventas.warehouse) = ?', [$restrictedWarehouse]);
+                    });
+            });
+        }
 
         return DataTables::of($detalles)
             ->addColumn('id', fn ($detalle) => $detalle->sale_id)
@@ -1307,6 +1399,15 @@ class VentaController extends Controller
     public function detalle($id)
     {
         $venta = Venta::with('detalles.producto')->findOrFail($id);
+        $restrictedWarehouse = $this->resolveWarehouseScopeForUser(Auth::user());
+
+        if ($restrictedWarehouse) {
+            $filteredDetalles = $this->filterDetallesByWarehouse($venta, $restrictedWarehouse);
+            if ($filteredDetalles->isEmpty()) {
+                abort(403, 'No tienes permiso para ver esta venta.');
+            }
+            $venta->setRelation('detalles', $filteredDetalles);
+        }
 
         $detalle = $venta->detalles->map(function ($item) {
             $producto = $item->producto;
