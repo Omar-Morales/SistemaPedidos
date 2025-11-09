@@ -83,16 +83,20 @@ class VentaController extends Controller
     {
         $normalized = strtolower($status ?? '');
 
-        if ($normalized === 'cancelled') {
-            return 'cancelled';
-        }
-
-        if ($normalized === 'paid') {
-            return 'paid';
+        if (in_array($normalized, ['pending', 'paid', 'to_collect', 'change', 'cancelled'], true)) {
+            return $normalized;
         }
 
         if ($amountPaid >= $subtotal && $subtotal > 0) {
             return 'paid';
+        }
+
+        if ($amountPaid > 0 && $amountPaid < $subtotal) {
+            return 'to_collect';
+        }
+
+        if ($amountPaid > $subtotal && $subtotal > 0) {
+            return 'change';
         }
 
         return 'pending';

@@ -1247,15 +1247,13 @@ $(document).on('click', '.edit-btn', async function () {
                     paymentStatusSelect.appendChild(option);
                 }
             }
-
-            paymentStatusSelect.value = currentStatus;
         }
 
         // Llenar tabla de detalle
         tablaDetalle.innerHTML = '';
         inicializarDataTableEditable();
 
-        let selectedDetailStatus = 'pending';
+        let selectedDetailStatus = venta.payment_status ?? 'pending';
 
         if (Array.isArray(venta.detalle)) {
             let displayedCount = 0;
@@ -1307,20 +1305,22 @@ $(document).on('click', '.edit-btn', async function () {
             totalInput.value = parseFloat(venta.total).toFixed(2);
         }
 
-            if (paymentStatusSelect) {
-                paymentStatusSelect.disabled = false;
-                if (!getAvailablePaymentStatuses().includes(selectedDetailStatus)) {
-                    let option = paymentStatusSelect.querySelector(`option[value="${selectedDetailStatus}"]`);
-                    if (!option) {
-                        option = document.createElement('option');
-                        option.value = selectedDetailStatus;
-                        option.textContent = paymentStatusText[selectedDetailStatus] || selectedDetailStatus;
-                        paymentStatusSelect.appendChild(option);
-                    }
+        if (paymentStatusSelect) {
+            paymentStatusSelect.disabled = false;
+            const valueToApply = venta.payment_status ?? selectedDetailStatus ?? 'pending';
+            if (!getAvailablePaymentStatuses().includes(valueToApply)) {
+                let option = paymentStatusSelect.querySelector(`option[value="${valueToApply}"]`);
+                if (!option) {
+                    option = document.createElement('option');
+                    option.value = valueToApply;
+                    option.textContent = paymentStatusText[valueToApply] || valueToApply;
+                    paymentStatusSelect.appendChild(option);
                 }
-                paymentStatusSelect.value = selectedDetailStatus;
-                paymentStatusSelect.dispatchEvent(new Event('change'));
             }
+
+            paymentStatusSelect.value = valueToApply;
+            paymentStatusSelect.dispatchEvent(new Event('change'));
+        }
 
         // Mostrar modal
         document.activeElement.blur();
