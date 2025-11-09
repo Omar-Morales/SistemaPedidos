@@ -149,7 +149,6 @@
                                 @if ($canManagePaymentStatuses)
                                     <option value="to_collect">Saldo pendiente</option>
                                     <option value="change">Vuelto pendiente</option>
-                                    <option value="cancelled">Anulado</option>
                                 @endif
                                 <option value="paid">Pagado</option>
                             </select>

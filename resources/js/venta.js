@@ -44,7 +44,7 @@ const isSupervisorRole = userRoles.includes('supervisor');
 const isWarehouseRole = Boolean(restrictedWarehouse);
 
 const basePaymentStatuses = ['pending', 'paid'];
-const adminPaymentStatuses = ['pending', 'paid', 'to_collect', 'change', 'cancelled'];
+const adminPaymentStatuses = ['pending', 'paid', 'to_collect', 'change'];
 const serverAllowsExtendedPayment = () => (formVenta?.dataset?.canManagePaymentStatuses || '').toLowerCase() === 'true';
 const hasExtendedPaymentPrivileges = () =>
     serverAllowsExtendedPayment() || userRoles.some(role => rolesWithExtendedPaymentPrivileges.has(role));
@@ -181,11 +181,13 @@ if (restrictedWarehouse) {
     $warehouse.prop('disabled', true);
 }
 
-function resetearModalVenta() {
+function resetearModalVenta(forNewSale = true) {
     formVenta.reset();
     $('#venta_id').val('');
     $('#status').val('pending');
-    isEditingVenta = false;
+    if (forNewSale) {
+        isEditingVenta = false;
+    }
     editingDetailId = null;
     hiddenDetails = [];
     $customer_id.val('').trigger('change');
@@ -218,9 +220,10 @@ function resetearModalVenta() {
     if (totalInput) totalInput.value = '0.00';
     if (amountPaidInput) amountPaidInput.value = '0.00';
     if (paymentStatusSelect) {
-        const allowExtended = hasExtendedPaymentPrivileges();
+        const allowExtended = forNewSale ? false : hasExtendedPaymentPrivileges();
         const allowedStatuses = allowExtended ? adminPaymentStatuses : basePaymentStatuses;
-        paymentStatusSelect.disabled = !allowExtended;
+        paymentStatusSelect.disabled = false;
+        paymentStatusSelect.dataset.allowExtended = allowExtended ? 'true' : 'false';
         if (!allowedStatuses.includes(paymentStatusSelect.value)) {
             paymentStatusSelect.value = 'pending';
         }
@@ -432,7 +435,7 @@ function cargarCustomersEnSelect(idSeleccionado = null, callback = null) {
 $('#btnCrearVenta').on('click', async (e) => {
     e.currentTarget.blur();
     $('#modalVentaLabel').text('Nueva Venta');
-    resetearModalVenta();
+    resetearModalVenta(true);
 
     // Mostrar overlay de carga
     $('#modalVenta .modal-content').append('<div id="cargandoOverlay" class="modal-loading-overlay"></div>');
@@ -457,7 +460,7 @@ $('#btnCrearVenta').on('click', async (e) => {
 });
 
 $('#modalVenta').on('hidden.bs.modal', function () {
-    resetearModalVenta();
+    resetearModalVenta(true);
     document.activeElement.blur();
 });
 
@@ -1181,7 +1184,7 @@ $(document).on('click', '.edit-btn', async function () {
     const id = $(this).data('id');
     const targetDetail = $(this).data('detail-id');
 
-    resetearModalVenta();
+    resetearModalVenta(false);
     isEditingVenta = true;
     editingDetailId = typeof targetDetail !== 'undefined' ? String(targetDetail) : null;
     hiddenDetails = [];
@@ -1235,8 +1238,12 @@ $(document).on('click', '.edit-btn', async function () {
         $('#total_price').val(parseFloat(venta.total).toFixed(2));
         if (amountPaidInput) amountPaidInput.value = parseFloat(venta.amount_paid).toFixed(2);
         if (paymentStatusSelect) {
-            paymentStatusSelect.disabled = false;
             const currentStatus = venta.payment_status || 'pending';
+            const isCancelledStatus = currentStatus === 'cancelled';
+            paymentStatusSelect.disabled = isCancelledStatus;
+            paymentStatusSelect.dataset.allowExtended = (!isCancelledStatus && hasExtendedPaymentPrivileges())
+                ? 'true'
+                : 'false';
 
             if (!getAvailablePaymentStatuses().includes(currentStatus)) {
                 let option = paymentStatusSelect.querySelector(`option[value="${currentStatus}"]`);
@@ -1244,9 +1251,12 @@ $(document).on('click', '.edit-btn', async function () {
                     option = document.createElement('option');
                     option.value = currentStatus;
                     option.textContent = paymentStatusText[currentStatus] || currentStatus;
+                    option.setAttribute('data-auto-status', 'true');
                     paymentStatusSelect.appendChild(option);
                 }
             }
+
+            paymentStatusSelect.value = currentStatus;
         }
 
         // Llenar tabla de detalle
@@ -1306,14 +1316,19 @@ $(document).on('click', '.edit-btn', async function () {
         }
 
         if (paymentStatusSelect) {
-            paymentStatusSelect.disabled = false;
             const valueToApply = venta.payment_status ?? selectedDetailStatus ?? 'pending';
+            const isCancelledValue = valueToApply === 'cancelled';
+            paymentStatusSelect.disabled = isCancelledValue;
+            paymentStatusSelect.dataset.allowExtended = (!isCancelledValue && hasExtendedPaymentPrivileges())
+                ? 'true'
+                : 'false';
             if (!getAvailablePaymentStatuses().includes(valueToApply)) {
                 let option = paymentStatusSelect.querySelector(`option[value="${valueToApply}"]`);
                 if (!option) {
                     option = document.createElement('option');
                     option.value = valueToApply;
                     option.textContent = paymentStatusText[valueToApply] || valueToApply;
+                    option.setAttribute('data-auto-status', 'true');
                     paymentStatusSelect.appendChild(option);
                 }
             }
