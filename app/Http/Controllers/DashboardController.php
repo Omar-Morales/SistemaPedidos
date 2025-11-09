@@ -32,21 +32,23 @@ class DashboardController extends Controller
     {
         $now = Carbon::now();
         $sixMonthsAgo = $now->copy()->subMonths(6);
+        $startOfMonth = $now->copy()->startOfMonth();
+        $endOfMonth = $now->copy()->endOfMonth();
 
-        // Ventas y compras por mes
+        // Ventas y compras por mes (últimos 6 meses para los gráficos)
         $ventas = Venta::select(DB::raw("SUM(total_price) as total"), DB::raw("TO_CHAR(sale_date, 'YYYY-MM') as month"))
-            ->where('sale_date', '>=', Carbon::now()->subMonths(6))
+            ->where('sale_date', '>=', $sixMonthsAgo)
             ->groupBy('month')
             ->orderBy('month')
             ->get();
 
         $compras = Compra::select(DB::raw("SUM(total_cost) as total"), DB::raw("TO_CHAR(purchase_date, 'YYYY-MM') as month"))
-            ->where('purchase_date', '>=', Carbon::now()->subMonths(6))
+            ->where('purchase_date', '>=', $sixMonthsAgo)
             ->groupBy('month')
             ->orderBy('month')
             ->get();
 
-        // Totales
+        // Totales históricos (se mantienen por si se necesitan en otros módulos)
         $stats = [
             'totalCategorias' => Category::count(),
             'totalProductos' => Product::count(),
@@ -55,8 +57,55 @@ class DashboardController extends Controller
             'totalUsuarios' => User::count(),
         ];
 
-        $totalVentas = Venta::sum('total_price');
-        $totalCompras = Compra::sum('total_cost');
+        // Métricas mensuales del mes en curso
+        $ventasMensualesQuery = Venta::whereBetween('sale_date', [$startOfMonth, $endOfMonth]);
+        $comprasMensualesQuery = Compra::whereBetween('purchase_date', [$startOfMonth, $endOfMonth]);
+
+        $totalVentasMes = (clone $ventasMensualesQuery)->sum('total_price');
+        $totalComprasMes = (clone $comprasMensualesQuery)->sum('total_cost');
+        $detalleVentasBase = DetalleVenta::whereHas('venta', function ($query) use ($startOfMonth, $endOfMonth) {
+            $query->whereBetween('sale_date', [$startOfMonth, $endOfMonth])
+                ->where(function ($inner) {
+                    $inner->whereNull('status')
+                        ->orWhere('status', '!=', 'cancelled');
+                });
+        });
+
+        $totalVentasTransaccionesMes = (clone $detalleVentasBase)
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', 'cancelled');
+            })
+            ->count();
+        $totalComprasTransaccionesMes = (clone $comprasMensualesQuery)->count();
+
+        $totalGananciaMes = $totalVentasMes - $totalComprasMes;
+
+        $completedStatuses = ['delivered', 'completed'];
+        $detallePedidosQuery = clone $detalleVentasBase;
+
+        $totalPedidosMes = (clone $detallePedidosQuery)
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', 'cancelled');
+            })
+            ->count();
+
+        $completedOrders = (clone $detallePedidosQuery)
+            ->whereIn('status', $completedStatuses)
+            ->count();
+
+        $pendingOrders = max($totalPedidosMes - $completedOrders, 0);
+
+        $completionRate = $totalPedidosMes > 0
+            ? round(($completedOrders / $totalPedidosMes) * 100, 2)
+            : 0;
+
+        $monthlySalesTarget = (float) config('dashboard.monthly_sales_target', env('MONTHLY_SALES_TARGET', 1500000));
+        $salesTargetProgress = $monthlySalesTarget > 0
+            ? min(round(($totalVentasMes / $monthlySalesTarget) * 100, 2), 999.99)
+            : 0;
+        $salesTargetRemaining = max($monthlySalesTarget - $totalVentasMes, 0);
 
         // Top productos
         $ventasProductos = DetalleVenta::select(
@@ -100,11 +149,25 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        $metrics = [
+            'totalComprasMonto' => $totalComprasMes,
+            'totalVentasMonto' => $totalVentasMes,
+            'totalComprasTransacciones' => $totalComprasTransaccionesMes,
+            'totalVentasTransacciones' => $totalVentasTransaccionesMes,
+            'pedidosCompletados' => $completedOrders,
+            'pedidosPendientes' => $pendingOrders,
+            'pedidosTotal' => $totalPedidosMes,
+            'pedidosCompletionRate' => $completionRate,
+            'totalGanancia' => $totalGananciaMes,
+            'salesTargetAmount' => $monthlySalesTarget,
+            'salesTargetProgress' => $salesTargetProgress,
+            'salesTargetRemaining' => $salesTargetRemaining,
+        ];
+
         return response()->json([
             'ventas' => $ventas,
             'compras' => $compras,
-            'totalVentas' => $totalVentas,
-            'totalCompras' => $totalCompras,
+            'metrics' => $metrics,
             'stats' => $stats,
             'ventasProductos' => $ventasProductos,
             'comprasProductos' => $comprasProductos,

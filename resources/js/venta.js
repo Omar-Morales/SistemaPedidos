@@ -40,13 +40,15 @@ for (const role of userRoles) {
 }
 
 const rolesWithExtendedPaymentPrivileges = new Set(['administrador', 'curva', 'milla', 'santa carolina']);
-const hasExtendedPaymentPrivileges = userRoles.some(role => rolesWithExtendedPaymentPrivileges.has(role));
 const isSupervisorRole = userRoles.includes('supervisor');
 const isWarehouseRole = Boolean(restrictedWarehouse);
 
 const basePaymentStatuses = ['pending', 'paid'];
 const adminPaymentStatuses = ['pending', 'paid', 'to_collect', 'change', 'cancelled'];
-const availablePaymentStatuses = hasExtendedPaymentPrivileges ? adminPaymentStatuses : basePaymentStatuses;
+const serverAllowsExtendedPayment = () => (formVenta?.dataset?.canManagePaymentStatuses || '').toLowerCase() === 'true';
+const hasExtendedPaymentPrivileges = () =>
+    serverAllowsExtendedPayment() || userRoles.some(role => rolesWithExtendedPaymentPrivileges.has(role));
+const getAvailablePaymentStatuses = () => (hasExtendedPaymentPrivileges() ? adminPaymentStatuses : basePaymentStatuses);
 const canUseDetailEditors = Boolean(detailEditorPanel) && hasExtendedPaymentPrivileges;
 let products = [];
 let detalleEditableDT = null;
@@ -216,15 +218,17 @@ function resetearModalVenta() {
     if (totalInput) totalInput.value = '0.00';
     if (amountPaidInput) amountPaidInput.value = '0.00';
     if (paymentStatusSelect) {
-        paymentStatusSelect.disabled = false;
-        if (!availablePaymentStatuses.includes(paymentStatusSelect.value)) {
+        const allowExtended = hasExtendedPaymentPrivileges();
+        const allowedStatuses = allowExtended ? adminPaymentStatuses : basePaymentStatuses;
+        paymentStatusSelect.disabled = !allowExtended;
+        if (!allowedStatuses.includes(paymentStatusSelect.value)) {
             paymentStatusSelect.value = 'pending';
         }
 
         const existingValues = Array.from(paymentStatusSelect.options).map(option => option.value);
-        if (!hasExtendedPaymentPrivileges) {
+        if (!allowExtended) {
             Array.from(paymentStatusSelect.options).forEach(option => {
-                if (!basePaymentStatuses.includes(option.value)) {
+                if (!allowedStatuses.includes(option.value)) {
                     option.remove();
                 }
             });
@@ -704,11 +708,11 @@ function calcularTotal() {
     const paymentStatus = computePaymentStatus(total, amountPaid);
     if (paymentStatusSelect) {
         if (isEditingVenta) {
-            if (!availablePaymentStatuses.includes(paymentStatusSelect.value)) {
+            if (!getAvailablePaymentStatuses().includes(paymentStatusSelect.value)) {
                 paymentStatusSelect.value = 'pending';
             }
         } else {
-            if (!availablePaymentStatuses.includes(paymentStatus)) {
+            if (!getAvailablePaymentStatuses().includes(paymentStatus)) {
                 let option = paymentStatusSelect.querySelector(`option[value="${paymentStatus}"]`);
                 if (!option) {
                     option = document.createElement('option');
@@ -767,7 +771,7 @@ if (paymentStatusSelect) {
         }
 
         let selectedStatus = paymentStatusSelect.value || 'pending';
-        if (!hasExtendedPaymentPrivileges && selectedStatus !== 'paid') {
+        if (!hasExtendedPaymentPrivileges() && selectedStatus !== 'paid') {
             selectedStatus = 'pending';
             paymentStatusSelect.value = selectedStatus;
         }
@@ -1234,7 +1238,7 @@ $(document).on('click', '.edit-btn', async function () {
             paymentStatusSelect.disabled = false;
             const currentStatus = venta.payment_status || 'pending';
 
-            if (!availablePaymentStatuses.includes(currentStatus)) {
+            if (!getAvailablePaymentStatuses().includes(currentStatus)) {
                 let option = paymentStatusSelect.querySelector(`option[value="${currentStatus}"]`);
                 if (!option) {
                     option = document.createElement('option');
@@ -1305,7 +1309,7 @@ $(document).on('click', '.edit-btn', async function () {
 
             if (paymentStatusSelect) {
                 paymentStatusSelect.disabled = false;
-                if (!availablePaymentStatuses.includes(selectedDetailStatus)) {
+                if (!getAvailablePaymentStatuses().includes(selectedDetailStatus)) {
                     let option = paymentStatusSelect.querySelector(`option[value="${selectedDetailStatus}"]`);
                     if (!option) {
                         option = document.createElement('option');

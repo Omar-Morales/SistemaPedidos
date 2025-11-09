@@ -5,17 +5,22 @@ axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[nam
 document.addEventListener('DOMContentLoaded', function () {
     axios.get(`/dashboard/data`)
         .then(({ data }) => {
-            // Totales
+            const metrics = data.metrics ?? {};
 
-            animateCounter('totalCategorias', data.stats.totalCategorias);
-            animateCounter('totalProductos', data.stats.totalProductos);
-            animateCounter('totalUsuarios', data.stats.totalUsuarios);
-
-            animateCounter('totalComprasMonto', data.totalCompras);
-            animateCounter('totalVentasMonto', data.totalVentas);
-
-            animateCounter('totalComprasTransacciones', data.stats.totalCompras);
-            animateCounter('totalVentasTransacciones', data.stats.totalVentas);
+            animateCounter('totalComprasMonto', metrics.totalComprasMonto ?? 0);
+            animateCounter('totalVentasMonto', metrics.totalVentasMonto ?? 0);
+            animateCounter('totalComprasTransacciones', metrics.totalComprasTransacciones ?? 0);
+            animateCounter('totalVentasTransacciones', metrics.totalVentasTransacciones ?? 0);
+            animateCounter('pedidosCompletados', metrics.pedidosCompletados ?? 0);
+            animateCounter('pedidosTotal', metrics.pedidosTotal ?? 0);
+            animateCounter('pedidosPendientes', metrics.pedidosPendientes ?? 0);
+            const completionRate = Number(metrics.pedidosCompletionRate ?? 0);
+            updateText('pedidosCompletionRate', `${completionRate.toFixed(2)}%`);
+            animateCounter('totalGanancia', metrics.totalGanancia ?? 0);
+            const targetProgress = Number(metrics.salesTargetProgress ?? 0);
+            animateCounter('salesTargetProgress', Math.round(targetProgress));
+            updateText('salesTargetAmount', formatCompactCurrency(metrics.salesTargetAmount ?? 0));
+            updateText('salesTargetRemaining', formatCompactCurrency(metrics.salesTargetRemaining ?? 0));
 
             // Ventas vs Compras (mensual)
             const meses = [...new Set([...data.ventas.map(v => v.month), ...data.compras.map(c => c.month)])].sort();
@@ -121,4 +126,36 @@ function animateCounter(elementId, endValue, duration = 500) {
     }
 
     requestAnimationFrame(update);
+}
+
+function updateText(elementId, value) {
+    const el = document.getElementById(elementId);
+    if (el) {
+        el.textContent = value;
+    }
+}
+
+function formatCurrency(value) {
+    const parsed = Number(value || 0);
+    return `S/. ${parsed.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatCompactCurrency(value) {
+    const parsed = Number(value || 0);
+    const absValue = Math.abs(parsed);
+    const suffixes = [
+        { value: 1e12, symbol: 'T' },
+        { value: 1e9, symbol: 'B' },
+        { value: 1e6, symbol: 'M' },
+        { value: 1e3, symbol: 'K' },
+    ];
+
+    if (absValue < 1000) {
+        return formatCurrency(parsed);
+    }
+
+    const match = suffixes.find((s) => absValue >= s.value) ?? suffixes[suffixes.length - 1];
+    const decimals = match.symbol === 'M' ? 3 : 1;
+    const compactValue = (parsed / match.value).toFixed(decimals).replace(/\.?0+$/, '');
+    return `S/. ${compactValue}${match.symbol}`;
 }

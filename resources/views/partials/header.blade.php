@@ -117,7 +117,7 @@
                         <a class="dropdown-item" href="{{ route('logout') }}"
                             onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                             <i class="mdi mdi-logout text-muted fs-16 align-middle me-1"></i>
-                            <span class="align-middle">Cerrar SesiÃ³n</span>
+                            <span class="align-middle">Cerrar Sesión</span>
                         </a>
                         <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
                             @csrf
@@ -135,7 +135,7 @@
             url: "{{ route('dashboard') }}"
         },
         {
-            nombre: 'CategorÃ­a',
+            nombre: 'Categoría',
             url: "{{ route('categorias.index') }}"
         },
         {
@@ -231,10 +231,9 @@
             if (resultado) {
                 window.location.href = resultado.url;
             } else {
-                alert('No se encontrÃ³ ninguna coincidencia.');
+                alert('No se encontró ninguna coincidencia.');
             }
         });
 
     });
 </script>
-

@@ -36,17 +36,17 @@ class CompraSeeder extends Seeder
                 // Crear la compra
                 $compra = Compra::create([
                     'supplier_id' => $supplier->id,
-                    'user_id' => 1, // Ajustar segÃºn el usuario administrador o de prueba
+                    'user_id' => 1, // Ajustar según el usuario administrador o de prueba
                     'tipodocumento_id' => $tipoDocumento->id,
-                    'total_cost' => 0, // Se actualizarÃ¡ despuÃ©s de agregar detalles
-                    'purchase_date' => now()->subDays(rand(1, 30)), // Fecha aleatoria en el Ãºltimo mes
+                    'total_cost' => 0, // Se actualizará después de agregar detalles
+                    'purchase_date' => now()->subDays(rand(1, 30)), // Fecha aleatoria en el último mes
                     'status' => 'completed',
                     'codigo' => 'TEMP',
                 ]);
 
                 $totalCost = 0;
 
-                // Cada compra tendrÃ¡ entre 1 y 5 detalles
+                // Cada compra tendrá entre 1 y 5 detalles
                 $detalleCount = rand(1, 15);
                 for ($j = 0; $j < $detalleCount; $j++) {
                     $product = $products->random();
@@ -70,7 +70,7 @@ class CompraSeeder extends Seeder
                         'type' => 'purchase',
                         'quantity' => $quantity,
                         'reason' => 'Compra ID: ' . $compra->id,
-                        'user_id' => 1, // Ajustar segÃºn el usuario administrador o de prueba
+                        'user_id' => 1, // Ajustar según el usuario administrador o de prueba
                     ]);
 
                     // Actualizar stock del producto
@@ -91,7 +91,6 @@ class CompraSeeder extends Seeder
         });
     }
 }
-
 
 
 

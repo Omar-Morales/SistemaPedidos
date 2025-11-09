@@ -78,7 +78,7 @@
     <!-- Modal Crear/Editar Venta -->
     <div class="modal fade" id="modalVenta" tabindex="-1" aria-labelledby="modalVentaLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
-            <form id="formVenta">
+            <form id="formVenta" data-can-manage-payment-statuses="{{ $canManagePaymentStatuses ? 'true' : 'false' }}">
                 @csrf
                 <input type="hidden" id="venta_id" name="venta_id">
                 <div class="modal-content">

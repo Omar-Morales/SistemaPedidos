@@ -97,7 +97,7 @@
                         <p class="text-uppercase fw-semibold text-muted mb-2">Ingresos del d&iacute;a</p>
                         <h4 class="fw-semibold mb-1 text-primary" id="summary-income">S/ 0.00</h4>
                         <p class="text-muted mb-0 small" id="summary-income-desc">Incluye todos los m&eacute;todos de pago</p>
-                        <div class="mt-2 small text-muted" id="summary-income-extra"></div>
+                        <div class="mt-2 small text-muted d-none" id="summary-income-extra"></div>
                     </div>
                 </div>
             </div>
