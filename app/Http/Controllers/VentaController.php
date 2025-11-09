@@ -515,7 +515,12 @@ class VentaController extends Controller
         $total = $activeDetails->sum('subtotal');
         $totalPagado = $activeDetails->sum('amount_paid');
         $statusVenta = $this->resolveSaleStatusFromDetails($detalleCollection->pluck('status'));
-        $paymentStatusVenta = $this->calculatePaymentStatus($total, $totalPagado);
+        $requestedPaymentStatus = strtolower($request->input('payment_status', 'pending'));
+        $allowedStatuses = ['pending', 'paid', 'to_collect', 'change', 'cancelled'];
+        if (!in_array($requestedPaymentStatus, $allowedStatuses, true)) {
+            $requestedPaymentStatus = $this->calculatePaymentStatus($total, $totalPagado);
+        }
+        $paymentStatusVenta = $requestedPaymentStatus;
         $differenceVenta = round($total - $totalPagado, 2);
         $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
 
@@ -782,7 +787,12 @@ class VentaController extends Controller
         $total = $detalleCollection->sum('subtotal');
         $totalPagado = $detalleCollection->sum('amount_paid');
         $statusVenta = $this->resolveSaleStatusFromDetails($detalleCollection->pluck('status'));
-        $paymentStatusVenta = $this->calculatePaymentStatus($total, $totalPagado);
+        $requestedPaymentStatus = strtolower($request->input('payment_status', $venta->payment_status ?? 'pending'));
+        $allowedStatuses = ['pending', 'paid', 'to_collect', 'change', 'cancelled'];
+        if (!in_array($requestedPaymentStatus, $allowedStatuses, true)) {
+            $requestedPaymentStatus = $this->calculatePaymentStatus($total, $totalPagado);
+        }
+        $paymentStatusVenta = $requestedPaymentStatus;
         $differenceVenta = round($total - $totalPagado, 2);
         $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
 

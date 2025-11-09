@@ -781,7 +781,8 @@ if (paymentStatusSelect) {
 
         const forcePaid = selectedStatus === 'paid';
         const forceCancelled = selectedStatus === 'cancelled';
-        const shouldForceAmount = forcePaid || forceCancelled;
+        const forcePending = selectedStatus === 'pending';
+        const shouldForceAmount = forcePaid || forceCancelled || forcePending;
 
         detalleEditableDT.rows().every(function () {
             const row = this.node();
@@ -797,7 +798,10 @@ if (paymentStatusSelect) {
 
             if (hidden.amount) {
                 if (shouldForceAmount) {
-                    const enforcedAmount = forcePaid ? subtotal : 0;
+                    let enforcedAmount = subtotal;
+                    if (forceCancelled || forcePending) {
+                        enforcedAmount = 0;
+                    }
                     hidden.amount.value = enforcedAmount.toFixed(2);
                     if (hidden.difference) {
                         hidden.difference.value = (subtotal - enforcedAmount).toFixed(2);
@@ -812,7 +816,10 @@ if (paymentStatusSelect) {
         hiddenDetails = hiddenDetails.map(detail => {
             const subtotal = parseFloat(detail.subtotal) || 0;
             if (shouldForceAmount) {
-                const enforcedAmount = forcePaid ? subtotal : 0;
+                let enforcedAmount = subtotal;
+                if (forceCancelled || forcePending) {
+                    enforcedAmount = 0;
+                }
                 return {
                     ...detail,
                     payment_status: selectedStatus,
@@ -1101,6 +1108,8 @@ formVenta.addEventListener('submit', function (e) {
 
         const formData = new FormData(formVenta);
         const ventaId = formData.get('venta_id');
+        const selectedPaymentStatus = paymentStatusSelect?.value || 'pending';
+        formData.set('payment_status', selectedPaymentStatus);
 
         if (isDetailEdit) {
             if (detalle.length !== 1) {
