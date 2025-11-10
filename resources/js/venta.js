@@ -360,9 +360,31 @@ if (detailOrderStatusSelect) {
         const activeRow = getActiveEditableRow();
         if (!activeRow) return;
         const hidden = getHiddenFields(activeRow);
+        const selectedOrderStatus = detailOrderStatusSelect.value;
+
         if (hidden.orderStatus) {
-            hidden.orderStatus.value = detailOrderStatusSelect.value;
+            hidden.orderStatus.value = selectedOrderStatus;
         }
+
+        if (selectedOrderStatus === 'cancelled') {
+            const subtotalInput = activeRow.querySelector('.subtotal-input');
+            const subtotal = subtotalInput ? parseFloat(subtotalInput.value) || 0 : 0;
+
+            if (hidden.paymentStatus) {
+                hidden.paymentStatus.value = 'cancelled';
+            }
+            if (hidden.amount) {
+                hidden.amount.value = '0.00';
+            }
+            if (detailAmountPaidInput) {
+                detailAmountPaidInput.value = '0.00';
+            }
+            if (hidden.difference) {
+                hidden.difference.value = subtotal.toFixed(2);
+            }
+        }
+
+        calcularTotal();
     });
 }
 
