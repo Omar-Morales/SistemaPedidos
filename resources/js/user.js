@@ -64,7 +64,11 @@ const table = $('#usersTable').DataTable({
         xhrFields: { withCredentials: true }
     },
     columns: [
-        { data: 'id', name: 'id' },
+        {
+            data: 'row_number',
+            name: 'row_number',
+            searchable: false,
+        },
         {
             data: 'photo',
             name: 'photo',

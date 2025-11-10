@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use App\Models\Supplier;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SupplierController extends Controller
 {
@@ -83,11 +84,22 @@ class SupplierController extends Controller
 
             public function getData(Request $request)
     {
-        $suppliers = Supplier::select(['id', 'ruc', 'name', 'email', 'phone', 'status'])->where('status', 'active');
+        $suppliers = Supplier::select([
+                'id',
+                'ruc',
+                'name',
+                'email',
+                'phone',
+                'status',
+                DB::raw("(SELECT COUNT(*) FROM suppliers s2 WHERE s2.status = 'active' AND s2.id <= suppliers.id) as row_number"),
+            ])
+            ->where('status', 'active');
 
 
         if ($request->ajax()) {
         return DataTables::of($suppliers)
+            ->orderColumn('row_number', 'row_number $1')
+            ->addColumn('row_number', fn($supplier) => (int) ($supplier->row_number ?? 0))
             ->addColumn('acciones', function ($supplier) {
             $acciones = '';
 

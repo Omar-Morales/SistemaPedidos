@@ -20,7 +20,11 @@ const table = $('#rolesTable').DataTable({
     lengthChange: false,
     ajax: '/roles/data',
     columns: [
-        { data: 'id', name: 'id' },
+        {
+            data: 'row_number',
+            name: 'row_number',
+            searchable: false,
+        },
         { data: 'name', name: 'name' },
         { data: 'created_at', name: 'created_at', orderable: false, searchable: false },
         { data: 'acciones', name: 'acciones', orderable: false, searchable: false }

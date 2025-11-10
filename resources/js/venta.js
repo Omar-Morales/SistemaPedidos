@@ -488,19 +488,9 @@ $('#modalVenta').on('hidden.bs.modal', function () {
 
 const ventasTableColumns = [
     {
-        data: 'id',
-        name: 'detalle_ventas.sale_id',
+        data: 'row_number',
+        name: 'row_number',
         searchable: false,
-        render: function (data, type, row, meta) {
-            if (type === 'display') {
-                const totalRecords = meta?.settings?._iRecordsDisplay ?? 0;
-                if (totalRecords > 0) {
-                    return totalRecords - (meta.row + meta.settings._iDisplayStart);
-                }
-                return meta.row + meta.settings._iDisplayStart + 1;
-            }
-            return data;
-        },
     },
     { data: 'fecha', name: 'ventas.sale_date' },
     { data: 'cliente', name: 'customers.name' },
@@ -544,7 +534,6 @@ const table = $('#ventasTable').DataTable({
         }
     ]
 });
-
 // Personalizar los estilos al cambiar visibilidad de columnas
 
         function updateColvisStyles() {

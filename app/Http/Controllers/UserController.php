@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -136,10 +137,14 @@ class UserController extends Controller
 
             public function getData(Request $request)
     {
-        $users = User::with('roles')->where('status', 'active');
+        $users = User::with('roles')
+            ->select('users.*', DB::raw("(SELECT COUNT(*) FROM users u2 WHERE u2.status = 'active' AND u2.id <= users.id) as row_number"))
+            ->where('status', 'active');
 
             if ($request->ajax()) {
                 return DataTables::of($users)
+                    ->orderColumn('row_number', 'row_number $1')
+                    ->addColumn('row_number', fn($user) => (int) ($user->row_number ?? 0))
                     ->addColumn('photo', function ($user) {
                     $url = $user->photo && Storage::disk('public')->exists($user->photo)
                     ? asset('storage/' . $user->photo)

@@ -654,7 +654,9 @@ class VentaController extends Controller
                         'unit_price' => $detalle->unit_price,
                         'subtotal' => $detalle->subtotal,
                         'status' => $detalle->status,
-                        'payment_status' => $detalle->payment_status === 'paid' ? 'paid' : 'pending',
+                        'payment_status' => in_array($detalle->payment_status, ['pending', 'paid', 'to_collect', 'change', 'cancelled'], true)
+                            ? $detalle->payment_status
+                            : 'pending',
                         'amount_paid' => $detalle->amount_paid,
                         'difference' => $detalle->difference,
                         'warehouse' => $detalle->warehouse,
@@ -1307,6 +1309,7 @@ class VentaController extends Controller
                 'users.name as user_name',
                 'products.name as product_name',
                 'products.status as product_status',
+                DB::raw('(SELECT COUNT(*) FROM detalle_ventas dv2 WHERE dv2.id <= detalle_ventas.id) as row_number'),
             ])
             ->join('ventas', 'ventas.id', '=', 'detalle_ventas.sale_id')
             ->leftJoin('customers', 'customers.id', '=', 'ventas.customer_id')
@@ -1327,6 +1330,8 @@ class VentaController extends Controller
         }
 
         return DataTables::of($detalles)
+            ->orderColumn('row_number', 'row_number $1')
+            ->addColumn('row_number', fn ($detalle) => (int) ($detalle->row_number ?? 0))
             ->addColumn('id', fn ($detalle) => $detalle->sale_id)
             ->addColumn('fecha', fn ($detalle) => Carbon::parse($detalle->sale_date)->format('d/m/Y'))
             ->addColumn('cliente', fn ($detalle) => $detalle->customer_name ?? '-')

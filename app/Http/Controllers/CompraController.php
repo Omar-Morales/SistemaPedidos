@@ -566,12 +566,15 @@ public function update(Request $request, $id)
                 'suppliers.name as supplier_name',
                 'tipodocumento.name as tipodocumento_name',
                 'users.name as user_name',
+                DB::raw('(SELECT COUNT(*) FROM compras c2 WHERE c2.id <= compras.id) as row_number'),
             ])
             ->leftJoin('suppliers', 'suppliers.id', '=', 'compras.supplier_id')
             ->leftJoin('tipodocumento', 'tipodocumento.id', '=', 'compras.tipodocumento_id')
             ->leftJoin('users', 'users.id', '=', 'compras.user_id');
 
         return \DataTables::of($compras)
+            ->orderColumn('row_number', 'row_number $1')
+            ->addColumn('row_number', fn($c) => (int) ($c->row_number ?? 0))
             ->addColumn('proveedor', fn($c) => $c->supplier_name ?? '-')
             ->addColumn('tipo_documento', fn($c) => $c->tipodocumento_name ?? '-')
             ->addColumn('codigo_numero', fn($c) => $c->codigo_numero ?? '-')

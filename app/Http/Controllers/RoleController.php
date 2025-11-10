@@ -104,8 +104,12 @@ class RoleController extends Controller
     public function getData(Request $request)
     {
         if ($request->ajax()) {
-            $roles = Role::with('permissions')->select('id','name', 'created_at');
+            $roles = Role::with('permissions')
+                ->select('id','name', 'created_at',
+                    DB::raw('(SELECT COUNT(*) FROM roles r2 WHERE r2.id <= roles.id) as row_number'));
             return DataTables::of($roles)
+                ->orderColumn('row_number', 'row_number $1')
+                ->addColumn('row_number', fn($r) => (int) ($r->row_number ?? 0))
                 ->addColumn('created_at', fn($c) => Carbon::parse($c->created_at)->format('d/m/Y'))
                 ->addColumn('acciones', function ($r) {
                     $acciones = '';

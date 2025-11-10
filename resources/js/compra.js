@@ -182,19 +182,9 @@ const table = $('#comprasTable').DataTable({
     ajax: '/compras/data',
     columns: [
         {
-            data: 'id',
-            name: 'compras.id',
+            data: 'row_number',
+            name: 'row_number',
             searchable: false,
-            render: function (data, type, row, meta) {
-                if (type === 'display') {
-                    const totalRecords = meta?.settings?._iRecordsDisplay ?? 0;
-                    if (totalRecords > 0) {
-                        return totalRecords - (meta.row + meta.settings._iDisplayStart);
-                    }
-                    return meta.row + meta.settings._iDisplayStart + 1;
-                }
-                return data;
-            },
         },
         { data: 'proveedor', name: 'suppliers.name' },
         { data: 'tipo_documento', name: 'tipodocumento.name' },

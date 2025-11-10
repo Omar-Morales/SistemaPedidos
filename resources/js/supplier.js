@@ -13,7 +13,11 @@ const suppliersTable = $("#suppliersTable").DataTable({
     type: "GET",
   },
   columns: [
-    { data: "id", name: "id" },
+    {
+      data: "row_number",
+      name: "row_number",
+      searchable: false,
+    },
     { data: "ruc", name: "ruc" },
     { data: "name", name: "name" },
     { data: "email", name: "email" },
@@ -23,7 +27,7 @@ const suppliersTable = $("#suppliersTable").DataTable({
   language: { url: "/assets/js/es-ES.json" },
   responsive: true,
   autoWidth: false,
-  order: [[0, "asc"]],
+  order: [[0, "desc"]],
   pageLength: 10,
   dom: "Bfrtip",
   buttons: [
