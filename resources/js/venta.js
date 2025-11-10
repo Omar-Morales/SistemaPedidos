@@ -1110,7 +1110,6 @@ formVenta.addEventListener('submit', function (e) {
         const ventaId = formData.get('venta_id');
         const selectedPaymentStatus = paymentStatusSelect?.value || 'pending';
         formData.set('payment_status', selectedPaymentStatus);
-
         if (isDetailEdit) {
             if (detalle.length !== 1) {
                 Swal.fire('Error', 'No se pudo identificar el detalle a editar.', 'error');
@@ -1125,6 +1124,7 @@ formVenta.addEventListener('submit', function (e) {
                 payment_method: formData.get('payment_method'),
                 delivery_type: formData.get('delivery_type'),
                 warehouse: formData.get('warehouse'),
+                payment_status: selectedPaymentStatus,
                 detail: detailPayload,
             };
 

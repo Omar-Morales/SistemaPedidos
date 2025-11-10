@@ -1075,6 +1075,16 @@ class VentaController extends Controller
 
                 $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
 
+                $venta->load('detalles');
+                $activeDetails = $venta->detalles->where('status', '!=', 'cancelled');
+                $total = $activeDetails->sum('subtotal');
+                $amountTotal = $activeDetails->sum('amount_paid');
+                $requestedPaymentStatus = strtolower($request->input('payment_status', $venta->payment_status ?? 'pending'));
+                $allowedStatuses = ['pending', 'paid', 'to_collect', 'change', 'cancelled'];
+                if (!in_array($requestedPaymentStatus, $allowedStatuses, true)) {
+                    $requestedPaymentStatus = $this->calculatePaymentStatus($total, $amountTotal);
+                }
+
                 $venta->update([
                     'customer_id' => $request->input('customer_id'),
                     'tipodocumento_id' => $request->input('tipodocumento_id'),
@@ -1082,20 +1092,12 @@ class VentaController extends Controller
                     'payment_method' => $paymentMethodVenta,
                     'delivery_type' => $request->input('delivery_type', $venta->delivery_type),
                     'warehouse' => $request->input('warehouse', $venta->warehouse),
+                    'total_price' => $total,
+                    'amount_paid' => $amountTotal,
+                    'difference' => round($total - $amountTotal, 2),
+                    'status' => $this->resolveSaleStatusFromDetails($venta->detalles->pluck('status')),
+                    'payment_status' => $requestedPaymentStatus,
                 ]);
-
-                $venta->load('detalles');
-
-                $activeDetails = $venta->detalles->where('status', '!=', 'cancelled');
-                $total = $activeDetails->sum('subtotal');
-                $amountTotal = $activeDetails->sum('amount_paid');
-
-                $venta->total_price = $total;
-                $venta->amount_paid = $amountTotal;
-                $venta->difference = round($total - $amountTotal, 2);
-                $venta->status = $this->resolveSaleStatusFromDetails($venta->detalles->pluck('status'));
-                $venta->payment_status = $this->calculatePaymentStatus($total, $amountTotal);
-                $venta->save();
 
                 $transactionAmount = $venta->status === 'cancelled' ? 0 : $venta->total_price;
 
