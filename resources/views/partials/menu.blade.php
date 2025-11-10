@@ -42,7 +42,7 @@
                     {{-- <li class="menu-title"><span>Dashboard</span></li> --}}
                     <li class="nav-item">
                         <a class="nav-link menu-link" href="{{ route('dashboard') }}">
-                            <i class="ri-window-line"></i> <span>Dashboard</span>
+                            <i class="ri-dashboard-2-line"></i> <span>Dashboard</span>
                         </a>
                     </li>
                 @endcan
@@ -51,40 +51,40 @@
                     {{-- <li class="menu-title"><span>Mantenimiento</span></li> --}}
                     @can('administrar.categorias.index')
                         <li class="nav-item"><a class="nav-link menu-link" href="{{ route('categorias.index') }}"><i
-                                    class="ri-flag-2-line"></i> <span>Categorias</span></a></li>
+                                    class="ri-folders-line"></i> <span>Categorias</span></a></li>
                     @endcan
                     @can('administrar.productos.index')
                         <li class="nav-item"><a class="nav-link menu-link" href="{{ route('products.index') }}"><i
-                                    class="ri-pushpin-fill"></i> <span>Productos</span></a></li>
+                                    class="ri-price-tag-3-line"></i> <span>Productos</span></a></li>
                     @endcan
                     @can('administrar.clientes.index')
                         <li class="nav-item"><a class="nav-link menu-link" href="{{ route('customers.index') }}"><i
-                                    class="ri-user-5-fill"></i> <span>Tiendas</span></a></li>
+                                    class="ri-store-3-line"></i> <span>Tiendas</span></a></li>
                     @endcan
                     @can('administrar.proveedores.index')
                         <li class="nav-item"><a class="nav-link menu-link" href="{{ route('suppliers.index') }}"><i
-                                    class="ri-account-box-line"></i> <span>Proveedor</span></a></li>
+                                    class="ri-truck-line"></i> <span>Proveedor</span></a></li>
                     @endcan
                     @can('administrar.usuarios.index')
                         <li class="nav-item"><a class="nav-link menu-link" href="{{ route('users.index') }}"><i
-                                    class="ri-honour-line"></i> <span>Usuarios</span></a></li>
+                                    class="ri-team-line"></i> <span>Usuarios</span></a></li>
                     @endcan
                     @can('administrar.roles.index')
                         <li class="nav-item"><a class="nav-link menu-link" href="{{ route('roles.index') }}"><i
-                                    class="ri-checkbox-line"></i> <span>Roles</span></a></li>
+                                    class="ri-shield-user-line"></i> <span>Roles</span></a></li>
                     @endcan
                 @endcanany
 
                 {{-- <li class="menu-title"><span>Compra</span></li> --}}
                 @can('administrar.compras.index')
                     <li class="nav-item"><a class="nav-link menu-link" href="{{ route('compras.index') }}"><i
-                                class="ri-red-packet-fill"></i> <span>Compras</span></a></li>
+                                class="ri-shopping-cart-2-line"></i> <span>Compras</span></a></li>
                 @endcan
 
                 {{-- <li class="menu-title"><span>Ventas</span></li> --}}
                 @can('administrar.ventas.index')
                     <li class="nav-item"><a class="nav-link menu-link" href="{{ route('ventas.index') }}"><i
-                                class="ri-store-line"></i> <span>Ventas</span></a></li>
+                                class="ri-bill-line"></i> <span>Ventas</span></a></li>
                 @endcan
 
                 {{-- <li class="menu-title"><span>Inventario</span></li> --}}
