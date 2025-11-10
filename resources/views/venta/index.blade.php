@@ -46,7 +46,7 @@
                                     style="width:100%">
                                     <thead>
                                         <tr>
-                                            <th>ID</th>
+                                            <th>#</th>
                                             <th>Fecha</th>
                                             <th>Cliente</th>
                                             <th>Producto</th>
