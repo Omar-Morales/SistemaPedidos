@@ -1346,9 +1346,25 @@ class VentaController extends Controller
                     default => 'Curva',
                 };
             })
-            ->addColumn('total', fn ($detalle) => 'S/ ' . number_format($detalle->subtotal, 2))
-            ->addColumn('monto_pagado', fn ($detalle) => 'S/ ' . number_format($detalle->amount_paid, 2))
+            ->addColumn('total', function ($detalle) {
+                if ($detalle->detalle_status === 'cancelled') {
+                    return 'S/ 0.00';
+                }
+
+                return 'S/ ' . number_format($detalle->subtotal, 2);
+            })
+            ->addColumn('monto_pagado', function ($detalle) {
+                if ($detalle->detalle_status === 'cancelled') {
+                    return 'S/ 0.00';
+                }
+
+                return 'S/ ' . number_format($detalle->amount_paid, 2);
+            })
             ->addColumn('diferencia', function ($detalle) {
+                if ($detalle->detalle_status === 'cancelled') {
+                    return 'S/ 0.00';
+                }
+
                 $difference = (float) $detalle->difference;
                 if ($difference < 0) {
                     return '<span class="text-danger">-S/ ' . number_format(abs($difference), 2) . '</span>';

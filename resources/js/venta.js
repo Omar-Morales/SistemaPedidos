@@ -1004,6 +1004,11 @@ $(document).on('click', '.remove-row', function () {
     }
 
     calcularTotal();
+
+    if (table.rows().count() === 0 && hiddenDetails.length === 0) {
+        if (totalInput) totalInput.value = '0.00';
+        if (amountPaidInput) amountPaidInput.value = '0.00';
+    }
 });
 
 formVenta.addEventListener('submit', function (e) {
