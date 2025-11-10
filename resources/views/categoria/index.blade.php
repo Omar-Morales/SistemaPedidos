@@ -36,7 +36,7 @@
                                 <table id="categoriasTable" class="table table-bordered dt-responsive nowrap table-striped align-middle" style="width:100%">
                                     <thead>
                                         <tr>
-                                            <th>ID</th>
+                                            <th>#</th>
                                             <th>Nombre</th>
                                             <th>Descripción</th>
                                             <th>Acciones</th>

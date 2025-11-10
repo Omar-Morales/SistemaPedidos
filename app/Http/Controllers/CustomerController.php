@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Customer;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class CustomerController extends Controller
@@ -134,11 +135,21 @@ class CustomerController extends Controller
 
     public function getData(Request $request)
     {
-        $customers = Customer::select(['id', 'ruc', 'name', 'address', 'phone', 'status'])
+        $customers = Customer::select([
+                'id',
+                'ruc',
+                'name',
+                'address',
+                'phone',
+                'status',
+                DB::raw("(SELECT COUNT(*) FROM customers c2 WHERE c2.status = 'active' AND c2.id <= customers.id) as row_number"),
+            ])
             ->where('status', 'active');
 
         if ($request->ajax()) {
             return DataTables::of($customers)
+                ->orderColumn('row_number', 'row_number $1')
+                ->addColumn('row_number', fn($customer) => (int) ($customer->row_number ?? 0))
                 ->addColumn('location', fn($customer) => $customer->address ?? '-')
                 ->addColumn('acciones', function ($customer) {
                     $acciones = '';

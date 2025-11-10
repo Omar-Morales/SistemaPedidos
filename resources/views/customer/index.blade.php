@@ -35,7 +35,7 @@
                             <table id="customersTable" class="table table-bordered dt-responsive nowrap table-striped align-middle" style="width:100%">
                                 <thead>
                                     <tr>
-                                        <th>ID</th>
+                                        <th>#</th>
                                         <th>RUC</th>
                                         <th>Nombre</th>
                                         <th>Ubicacion</th>

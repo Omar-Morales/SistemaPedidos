@@ -20,7 +20,7 @@ let table = $('#productsTable').DataTable({
 
   columns: [
 
-    { data:'id' },
+    { data:'row_number', name: 'row_number', searchable: false },
 
     { data:'image', orderable:false, searchable:false },
 
@@ -48,7 +48,8 @@ let table = $('#productsTable').DataTable({
 
     { extend:'colvis', text:'Seleccionar Columnas', className:'btn btn-info', postfixButtons:['colvisRestore'] }
 
-  ]
+  ],
+  order: [[0, 'desc']]
 
 });
 

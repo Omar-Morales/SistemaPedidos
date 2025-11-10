@@ -244,10 +244,12 @@ class ProductController extends Controller
     public function getData(Request $request)
     {
     $products = Product::with('category', 'images')
-        ->select('products.*')
+        ->select('products.*', DB::raw("(SELECT COUNT(*) FROM products p2 WHERE p2.status IN ('available','sold') AND p2.id <= products.id) as row_number"))
         ->whereIn('products.status', ['available', 'sold']);
 
     return DataTables::of($products)
+            ->orderColumn('row_number', 'row_number $1')
+            ->addColumn('row_number', fn($product) => (int) ($product->row_number ?? 0))
             ->addColumn('estado', function ($product) {
                 return match($product->status) {
                     'available' => '<span class="badge bg-success p-2">Disponible</span>',

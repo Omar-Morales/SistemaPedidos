@@ -23,7 +23,7 @@ axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[nam
                 }
             },
             columns: [
-                { data: 'id', name: 'id' },
+                { data: 'row_number', name: 'row_number', searchable: false },
                 { data: 'name', name: 'name' },
                 { data: 'description', name: 'description' },
                 { data: 'acciones', name: 'acciones', orderable: false, searchable: false }
@@ -35,7 +35,7 @@ axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[nam
             autoWidth: false,
             //lengthMenu: [10, 25, 50, 75, 100],
             pageLength: 10,
-            order: [[0, 'asc']],
+            order: [[0, 'desc']],
             dom: 'Bfrtip',
             buttons: [
                 {

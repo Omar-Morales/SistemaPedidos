@@ -107,10 +107,17 @@ class CategoryController extends Controller
 
     public function getData(Request $request)
     {
-    $categorias = Category::select(['id', 'name', 'description'])->where('status', 'active');
+    $categorias = Category::select([
+            'id',
+            'name',
+            'description',
+            DB::raw("(SELECT COUNT(*) FROM categories c2 WHERE c2.status = 'active' AND c2.id <= categories.id) as row_number"),
+        ])->where('status', 'active');
 
      if ($request->ajax()) {
     return DataTables::of($categorias)
+        ->orderColumn('row_number', 'row_number $1')
+        ->addColumn('row_number', fn($categoria) => (int) ($categoria->row_number ?? 0))
         ->addColumn('acciones', function ($categoria) {
         $acciones = '';
 

@@ -50,7 +50,7 @@ const table = $('#customersTable').DataTable({
         type: 'GET'
     },
     columns: [
-        { data: 'id', name: 'id' },
+        { data: 'row_number', name: 'row_number', searchable: false },
         { data: 'ruc', name: 'ruc' },
         { data: 'name', name: 'name' },
         { data: 'location', name: 'location', orderable: false, searchable: false },
@@ -61,7 +61,7 @@ const table = $('#customersTable').DataTable({
     responsive: true,
     autoWidth: false,
     pageLength: 10,
-    order: [[0, 'asc']],
+    order: [[0, 'desc']],
     dom: 'Bfrtip',
     buttons: [
         {
