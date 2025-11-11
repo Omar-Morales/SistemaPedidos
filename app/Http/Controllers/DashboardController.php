@@ -127,17 +127,11 @@ class DashboardController extends Controller
         $comprasProductos = $comprasProductosByRange['6m'] ?? collect();
 
         // Top clientes y proveedores
-        $topClientes = Venta::select(
-                'customers.name as cliente',
-                DB::raw('SUM(ventas.total_price) as total_ventas'),
-                DB::raw('COUNT(detalle_ventas.id) as total_pedidos')
-            )
-            ->join('customers', 'ventas.customer_id', '=', 'customers.id')
-            ->join('detalle_ventas', 'detalle_ventas.sale_id', '=', 'ventas.id')
-            ->groupBy('customers.name')
-            ->orderByDesc('total_ventas')
-            ->limit(5)
-            ->get();
+        $topClientesByRange = [];
+        foreach ($distributionRanges as $key => $startDate) {
+            $topClientesByRange[$key] = $this->topClientesDesde($startDate);
+        }
+        $topClientes = $topClientesByRange['6m'] ?? collect();
 
         $topProveedores = Compra::select(
                 'suppliers.name as proveedor',
@@ -225,6 +219,7 @@ class DashboardController extends Controller
             'ventasProductosByRange' => $ventasProductosByRange,
             'comprasProductosByRange' => $comprasProductosByRange,
             'topClientes' => $topClientes,
+            'topClientesByRange' => $topClientesByRange,
             'topProveedores' => $topProveedores,
             'ordersSummary' => $ordersSummary,
         ]);
@@ -269,6 +264,30 @@ class DashboardController extends Controller
                 return [
                     'producto' => $row->producto,
                     'total' => (int) $row->total,
+                ];
+            })
+            ->values();
+    }
+
+    protected function topClientesDesde(Carbon $startDate, int $limit = 5)
+    {
+        return Venta::select(
+                'customers.name as cliente',
+                DB::raw('SUM(ventas.total_price) as total_ventas'),
+                DB::raw('COUNT(detalle_ventas.id) as total_pedidos')
+            )
+            ->join('customers', 'ventas.customer_id', '=', 'customers.id')
+            ->join('detalle_ventas', 'detalle_ventas.sale_id', '=', 'ventas.id')
+            ->where('ventas.sale_date', '>=', $startDate)
+            ->groupBy('customers.name')
+            ->orderByDesc('total_ventas')
+            ->limit($limit)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'cliente' => $row->cliente,
+                    'total_ventas' => (float) $row->total_ventas,
+                    'total_pedidos' => (int) $row->total_pedidos,
                 ];
             })
             ->values();
