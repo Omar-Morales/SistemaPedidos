@@ -55,30 +55,43 @@ document.addEventListener('DOMContentLoaded', function () {
                 initOrdersPerformanceChart(data.ordersSummary);
             }
 
-            // Distribución de productos vendidos
-            const productosVentas = data.ventasProductos.map(p => p.producto);
-            const valoresVentas = data.ventasProductos.map(p => Number(p.total_vendido));
+            // Distribucion de productos vendidos/comprados con filtros
+            const distributionDefaultRange = '6m';
+            const ventasDistributionRanges = data.ventasProductosByRange ?? {};
+            const comprasDistributionRanges = data.comprasProductosByRange ?? {};
 
-            new ApexCharts(document.querySelector("#ventasProductosChart"), {
-                chart: { type: 'donut', height: 350 },
-                labels: productosVentas,
-                series: valoresVentas,
-                legend: { position: 'bottom' },
-                colors: ['#008FFB', '#00E396', '#FEB019', '#FF4560', '#775DD0']
-            }).render();
+            const ventasDefaultEntries = extractDistributionEntries(ventasDistributionRanges, distributionDefaultRange, data.ventasProductos ?? []);
+            const comprasDefaultEntries = extractDistributionEntries(comprasDistributionRanges, distributionDefaultRange, data.comprasProductos ?? []);
 
-            // Distribución de productos comprados
-            const productosCompras = data.comprasProductos.map(p => p.producto);
-            const valoresCompras = data.comprasProductos.map(p => Number(p.total_comprado));
+            const ventasDistribucionChart = initEchartsPieChart(
+                'ventasProductosChart',
+                ventasDefaultEntries.labels,
+                ventasDefaultEntries.values,
+                ['#405189', '#0AB39C', '#F7B84B', '#F06548', '#6F42C1']
+            );
 
-            new ApexCharts(document.querySelector("#comprasProductosChart"), {
-                chart: { type: 'donut', height: 350 },
-                labels: productosCompras,
-                series: valoresCompras,
-                legend: { position: 'bottom' },
-                colors: ['#FF5733', '#C70039', '#900C3F', '#581845', '#1E8449']
-            }).render();
+            const comprasDistribucionChart = initEchartsPieChart(
+                'comprasProductosChart',
+                comprasDefaultEntries.labels,
+                comprasDefaultEntries.values,
+                ['#0AB39C', '#299CDB', '#F7B84B', '#F06548', '#6F42C1']
+            );
 
+            setupDistributionFilter({
+                prefix: 'ventas',
+                chartRef: ventasDistribucionChart,
+                dataset: ventasDistributionRanges,
+                fallback: data.ventasProductos ?? [],
+                defaultRange: distributionDefaultRange,
+            });
+
+            setupDistributionFilter({
+                prefix: 'compras',
+                chartRef: comprasDistribucionChart,
+                dataset: comprasDistributionRanges,
+                fallback: data.comprasProductos ?? [],
+                defaultRange: distributionDefaultRange,
+            });
             // Top clientes
             const clientes = data.topClientes.map(c => c.cliente);
             const ventasClientes = data.topClientes.map(c => Number(c.total_ventas));
@@ -267,6 +280,184 @@ function renderOrdersPerformanceChart(chartInstance, summary, range) {
     updateText('ordersPerformanceConversion', formatPercentage(conversion));
 }
 
+function initEchartsPieChart(containerId, labels = [], values = [], colors = []) {
+    const el = document.getElementById(containerId);
+    const echartsLib = window.echarts;
+    if (!el || !echartsLib) {
+        return null;
+    }
+
+    const existingInstance = echartsLib.getInstanceByDom(el);
+    if (existingInstance) {
+        existingInstance.dispose();
+    }
+
+    const chart = echartsLib.init(el);
+    const dataset = buildPieSeriesData(labels, values, colors);
+
+    chart.setOption({
+        tooltip: {
+            trigger: 'item',
+            backgroundColor: '#fff',
+            borderColor: '#edf1f7',
+            borderWidth: 1,
+            textStyle: { color: '#212529', fontSize: 13, fontWeight: 500 },
+            padding: 11,
+            formatter: params => {
+                const marker = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${params.color};margin-right:8px;"></span>`;
+                return `
+                    <div style="font-size:13px; font-weight:500; color:#495057; margin-bottom:4px;">${params.name}</div>
+                    <div style="display:flex; align-items:center; font-size:13px; color:#8a96a3;">
+                        ${marker}
+                        <span style="margin-right:6px;">Cantidad:</span>
+                        <span style="color:#111927; font-size:14px;">${formatVelzonNumber(params.value)}</span>
+                    </div>
+                `.trim();
+            },
+        },
+        legend: {
+            orient: 'vertical',
+            left: 0,
+            top: 'middle',
+            textStyle: { color: '#6c757d', fontFamily: 'Poppins, sans-serif' },
+            icon: 'circle',
+            data: labels,
+        },
+        series: [
+            {
+                type: 'pie',
+                radius: '70%',
+                center: ['65%', '50%'],
+                data: dataset.data,
+                hoverAnimation: true,
+                label: {
+                    formatter: '{b}',
+                    color: '#6c757d',
+                    fontSize: 12,
+                },
+                labelLine: {
+                    show: true,
+                    length: 20,
+                    length2: 14,
+                    smooth: true,
+                },
+                itemStyle: {
+                    borderColor: 'transparent',
+                    borderWidth: 0,
+                },
+                emphasis: {
+                    scale: true,
+                    scaleSize: 6,
+                    label: {
+                        show: true,
+                        formatter: '{b}',
+                        fontWeight: 500,
+                        color: '#6c757d',
+                    },
+                    labelLine: {
+                        length: 25,
+                        length2: 18,
+                    },
+                    itemStyle: {
+                        shadowBlur: 15,
+                        shadowOffsetX: 0,
+                        shadowColor: 'rgba(0, 0, 0, 0.3)',
+                        borderColor: 'transparent',
+                        borderWidth: 0,
+                    },
+                },
+                color: dataset.palette,
+            },
+        ],
+        textStyle: { fontFamily: 'Poppins, sans-serif' },
+    });
+
+    const resizeHandler = () => chart.resize();
+    window.addEventListener('resize', resizeHandler);
+
+    return { chart, palette: dataset.palette, resizeHandler };
+}
+
+function updateEchartsPieChart(instance, labels = [], values = []) {
+    if (!instance || !instance.chart) {
+        return;
+    }
+    const dataset = buildPieSeriesData(labels, values, instance.palette);
+    instance.chart.setOption({
+        legend: { data: labels },
+        color: dataset.palette,
+        series: [
+            {
+                data: dataset.data,
+            },
+        ],
+    });
+}
+
+function buildPieSeriesData(labels = [], values = [], colors = []) {
+    const palette = (colors && colors.length) ? colors : ['#405189', '#0AB39C', '#F7B84B', '#F06548', '#6F42C1'];
+    const data = labels.map((label, index) => {
+        const color = palette[index % palette.length];
+        return {
+            name: label,
+            value: Number(values[index] ?? 0),
+            itemStyle: { color },
+            labelLine: {
+                lineStyle: {
+                    color,
+                    width: 1.4,
+                },
+            },
+        };
+    });
+
+    return { data, palette };
+}
+
+function extractDistributionEntries(dataset = {}, range = '6m', fallback = []) {
+    const hasRange = dataset && dataset[range] && dataset[range].length;
+    const entries = hasRange ? dataset[range] : (fallback ?? []);
+    return {
+        labels: entries.map(item => item.producto ?? ''),
+        values: entries.map(item => Number(item.total ?? item.total_vendido ?? item.total_comprado ?? 0)),
+    };
+}
+
+function labelForDistributionRange(range) {
+    switch (range) {
+        case '1m':
+            return 'Ultimo mes';
+        case '1y':
+            return 'Ultimo año';
+        case '6m':
+        default:
+            return 'Ultimos 6 meses';
+    }
+}
+
+function setupDistributionFilter({ prefix, chartRef, dataset = {}, fallback = [], defaultRange = '6m' }) {
+    const labelEl = document.getElementById(`${prefix}DistribucionOrdenLabel`);
+    const triggers = document.querySelectorAll(`.${prefix}-distribucion-order`);
+
+    const renderRange = (range) => {
+        const { labels, values } = extractDistributionEntries(dataset, range, fallback);
+        updateEchartsPieChart(chartRef, labels, values);
+        if (labelEl) {
+            labelEl.textContent = labelForDistributionRange(range);
+        }
+    };
+
+    triggers.forEach(item => {
+        item.addEventListener('click', (event) => {
+            event.preventDefault();
+            const range = item.getAttribute('data-range');
+            renderRange(range);
+        });
+    });
+
+    renderRange(defaultRange);
+}
+
 function buildOrdersPerformanceOptions(categories, ordersData, earningsData, refundsData) {
     return {
         chart: {
@@ -407,7 +598,7 @@ function formatCompactCurrency(value) {
     const parsed = Number(value || 0);
     const absValue = Math.abs(parsed);
     const suffixes = [
-        { value: 1e6, symbol: ' millones' },
+        { value: 1e6, symbol: ' M' },
         { value: 1e3, symbol: ' mil' },
     ];
 
@@ -527,3 +718,4 @@ function normalizeMonthKey(year, monthIndex) {
     const normalizedMonth = String(monthIndex + 1).padStart(2, '0');
     return `${year}-${normalizedMonth}`;
 }
+

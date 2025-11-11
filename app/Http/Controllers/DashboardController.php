@@ -107,26 +107,23 @@ class DashboardController extends Controller
             : 0;
         $salesTargetRemaining = max($monthlySalesTarget - $totalVentasMes, 0);
 
-        // Top productos
-        $ventasProductos = DetalleVenta::select(
-                'products.name as producto',
-                DB::raw('SUM(detalle_ventas.quantity) as total_vendido')
-            )
-            ->join('products', 'detalle_ventas.product_id', '=', 'products.id')
-            ->groupBy('products.name')
-            ->orderByDesc('total_vendido')
-            ->limit(5)
-            ->get();
+        // Top productos distribuci��n por rango
+        $distributionRanges = [
+            '1m' => $now->copy()->startOfMonth(),
+            '6m' => $now->copy()->subMonths(5)->startOfMonth(),
+            '1y' => $now->copy()->subMonths(11)->startOfMonth(),
+        ];
 
-        $comprasProductos = DetalleCompra::select(
-                'products.name as producto',
-                DB::raw('SUM(detalle_compras.quantity) as total_comprado')
-            )
-            ->join('products', 'detalle_compras.product_id', '=', 'products.id')
-            ->groupBy('products.name')
-            ->orderByDesc('total_comprado')
-            ->limit(5)
-            ->get();
+        $ventasProductosByRange = [];
+        $comprasProductosByRange = [];
+
+        foreach ($distributionRanges as $key => $startDate) {
+            $ventasProductosByRange[$key] = $this->topVentasProductosDesde($startDate);
+            $comprasProductosByRange[$key] = $this->topComprasProductosDesde($startDate);
+        }
+
+        $ventasProductos = $ventasProductosByRange['6m'] ?? collect();
+        $comprasProductos = $comprasProductosByRange['6m'] ?? collect();
 
         // Top clientes y proveedores
         $topClientes = Venta::select(
@@ -222,9 +219,55 @@ class DashboardController extends Controller
             'stats' => $stats,
             'ventasProductos' => $ventasProductos,
             'comprasProductos' => $comprasProductos,
+            'ventasProductosByRange' => $ventasProductosByRange,
+            'comprasProductosByRange' => $comprasProductosByRange,
             'topClientes' => $topClientes,
             'topProveedores' => $topProveedores,
             'ordersSummary' => $ordersSummary,
         ]);
+    }
+
+    protected function topVentasProductosDesde(Carbon $startDate, int $limit = 5)
+    {
+        return DetalleVenta::select(
+                'products.name as producto',
+                DB::raw('SUM(detalle_ventas.quantity) as total')
+            )
+            ->join('products', 'detalle_ventas.product_id', '=', 'products.id')
+            ->join('ventas', 'detalle_ventas.sale_id', '=', 'ventas.id')
+            ->where('ventas.sale_date', '>=', $startDate)
+            ->groupBy('products.name')
+            ->orderByDesc('total')
+            ->limit($limit)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'producto' => $row->producto,
+                    'total' => (int) $row->total,
+                ];
+            })
+            ->values();
+    }
+
+    protected function topComprasProductosDesde(Carbon $startDate, int $limit = 5)
+    {
+        return DetalleCompra::select(
+                'products.name as producto',
+                DB::raw('SUM(detalle_compras.quantity) as total')
+            )
+            ->join('products', 'detalle_compras.product_id', '=', 'products.id')
+            ->join('compras', 'detalle_compras.purchase_id', '=', 'compras.id')
+            ->where('compras.purchase_date', '>=', $startDate)
+            ->groupBy('products.name')
+            ->orderByDesc('total')
+            ->limit($limit)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'producto' => $row->producto,
+                    'total' => (int) $row->total,
+                ];
+            })
+            ->values();
     }
 }
