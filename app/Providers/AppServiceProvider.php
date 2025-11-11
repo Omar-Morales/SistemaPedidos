@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,7 +23,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-     View::composer(['partials.header', 'profile.edit'], function ($view) {
+        $this->syncCustomMenuCss();
+
+        View::composer(['partials.header', 'profile.edit'], function ($view) {
         $user = Auth::user();
 
         $photoPath = $user->photo;
@@ -46,6 +49,27 @@ class AppServiceProvider extends ServiceProvider
         $percent = round(($filled / count($fields)) * 100);
 
         $view->with(compact('user', 'photoUrl', 'percent'));
-    });
+        });
+    }
+
+    /**
+     * Keeps the dashboard menu CSS in sync between resources/ and public/.
+     */
+    protected function syncCustomMenuCss(): void
+    {
+        $source = resource_path('css/complements/personalizado.css');
+        $target = public_path('assets/css/personalizado.css');
+
+        if (!File::exists($source)) {
+            return;
+        }
+
+        $shouldCopy = !File::exists($target)
+            || File::lastModified($source) > File::lastModified($target);
+
+        if ($shouldCopy) {
+            File::ensureDirectoryExists(dirname($target));
+            File::copy($source, $target);
+        }
     }
 }
