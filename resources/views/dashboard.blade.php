@@ -469,6 +469,7 @@
                                         </span>
                                     </a>
                                     <div class="dropdown-menu dropdown-menu-end">
+                                        <a class="dropdown-item ventas-compras-order" data-order="1m" href="#">Ultimo mes</a>
                                         <a class="dropdown-item ventas-compras-order" data-order="6m" href="#">Ultimos 6 meses</a>
                                         <a class="dropdown-item ventas-compras-order" data-order="12m" href="#">Ultimos 12 meses</a>
                                         <a class="dropdown-item ventas-compras-order" data-order="ytd" href="#">Año en curso</a>
@@ -510,15 +511,15 @@
                                     <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                         <span class="fw-semibold text-uppercase fs-12">Ordenar por:</span>
                                         <span class="text-muted">
-                                            <span id="ordersPerformanceRangeLabel">Todo</span>
+                                            <span id="ordersPerformanceRangeLabel">Ultimos 6 meses</span>
                                             <i class="mdi mdi-chevron-down ms-1"></i>
                                         </span>
                                     </a>
                                     <div class="dropdown-menu dropdown-menu-end">
-                                        <a class="dropdown-item orders-performance-range active" data-range="all" href="#">Todo</a>
                                         <a class="dropdown-item orders-performance-range" data-range="1m" href="#">Ultimo mes</a>
-                                        <a class="dropdown-item orders-performance-range" data-range="6m" href="#">Ultimos 6 meses</a>
-                                        <a class="dropdown-item orders-performance-range" data-range="1y" href="#">Ultimo año</a>
+                                        <a class="dropdown-item orders-performance-range active" data-range="6m" href="#">Ultimos 6 meses</a>
+                                        <a class="dropdown-item orders-performance-range" data-range="12m" href="#">Ultimos 12 meses</a>
+                                        <a class="dropdown-item orders-performance-range" data-range="ytd" href="#">Año en curso</a>
                                     </div>
                                 </div>
                             </div>
@@ -583,7 +584,8 @@
                                         <div class="dropdown-menu dropdown-menu-end">
                                             <a class="dropdown-item ventas-distribucion-order" data-range="1m" href="#">Ultimo mes</a>
                                             <a class="dropdown-item ventas-distribucion-order" data-range="6m" href="#">Ultimos 6 meses</a>
-                                            <a class="dropdown-item ventas-distribucion-order" data-range="1y" href="#">Ultimo año</a>
+                                            <a class="dropdown-item ventas-distribucion-order" data-range="12m" href="#">Ultimos 12 meses</a>
+                                            <a class="dropdown-item ventas-distribucion-order" data-range="ytd" href="#">Año en curso</a>
                                         </div>
                                     </div>
                                 </div>
@@ -617,7 +619,8 @@
                                         <div class="dropdown-menu dropdown-menu-end">
                                             <a class="dropdown-item compras-distribucion-order" data-range="1m" href="#">Ultimo mes</a>
                                             <a class="dropdown-item compras-distribucion-order" data-range="6m" href="#">Ultimos 6 meses</a>
-                                            <a class="dropdown-item compras-distribucion-order" data-range="1y" href="#">Ultimo año</a>
+                                            <a class="dropdown-item compras-distribucion-order" data-range="12m" href="#">Ultimos 12 meses</a>
+                                            <a class="dropdown-item compras-distribucion-order" data-range="ytd" href="#">Año en curso</a>
                                         </div>
                                     </div>
                                 </div>
@@ -743,6 +746,10 @@
 
     </style>
 @endpush
+
+
+
+
 
 
 

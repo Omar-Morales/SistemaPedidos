@@ -111,7 +111,8 @@ class DashboardController extends Controller
         $distributionRanges = [
             '1m' => $now->copy()->startOfMonth(),
             '6m' => $now->copy()->subMonths(5)->startOfMonth(),
-            '1y' => $now->copy()->subMonths(11)->startOfMonth(),
+            '12m' => $now->copy()->subMonths(11)->startOfMonth(),
+            'ytd' => $now->copy()->startOfYear(),
         ];
 
         $ventasProductosByRange = [];

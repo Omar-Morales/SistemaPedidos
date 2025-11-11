@@ -162,6 +162,10 @@ function buildResumenChartOptions(categories = [], ventasData = [], comprasData 
 
 function labelForRange(range) {
     switch (range) {
+        case '1m':
+            return 'Ultimo mes';
+        case '6m':
+            return 'Ultimos 6 meses';
         case '12m':
             return 'Ultimos 12 meses';
         case 'ytd':
@@ -196,12 +200,15 @@ function selectResumenMonths(baseMonths = [], range = '6m') {
     const currentYearPrefix = `${new Date().getFullYear()}-`;
 
     switch (range) {
+        case '1m':
+            return months.slice(-1);
         case '12m':
             return months.slice(-12);
         case 'ytd': {
             const yearMonths = months.filter(key => key.startsWith(currentYearPrefix));
             return yearMonths.length ? yearMonths : months.slice(-12);
         }
+        case '6m':
         default:
             return months.slice(-6);
     }
@@ -224,10 +231,12 @@ function labelForOrdersPerformanceRange(range) {
             return 'Ultimo mes';
         case '6m':
             return 'Ultimos 6 meses';
-        case '1y':
-            return 'Ultimo año';
+        case '12m':
+            return 'Ultimos 12 meses';
+        case 'ytd':
+            return 'Año en curso';
         default:
-            return 'Todo';
+            return 'Ultimos 6 meses';
     }
 }
 
@@ -239,7 +248,7 @@ function initOrdersPerformanceChart(summary) {
     chartInstance.render();
 
     const buttons = document.querySelectorAll('.orders-performance-range');
-    let currentRange = 'all';
+    let currentRange = '6m';
     const ordersRangeLabel = document.getElementById('ordersPerformanceRangeLabel');
 
     const refreshOrdersRangeLabel = (range) => {
@@ -427,8 +436,10 @@ function labelForDistributionRange(range) {
     switch (range) {
         case '1m':
             return 'Ultimo mes';
-        case '1y':
-            return 'Ultimo año';
+        case '12m':
+            return 'Ultimos 12 meses';
+        case 'ytd':
+            return 'Año en curso';
         case '6m':
         default:
             return 'Ultimos 6 meses';
@@ -657,7 +668,7 @@ function aggregateOrdersSummary(summary = {}) {
     return { map, timeline };
 }
 
-function selectOrdersRange(aggregated = {}, range = 'all') {
+function selectOrdersRange(aggregated = {}, range = '6m') {
     const timeline = aggregated.timeline ?? [];
     if (!timeline.length) {
         return { categories: [], orders: [], earnings: [], refunds: [] };
@@ -672,12 +683,14 @@ function selectOrdersRange(aggregated = {}, range = 'all') {
         case '6m':
             selected = buildRangeFromEnd(lastPoint, 6);
             break;
-        case '1y':
+        case '12m':
             selected = buildRangeFromEnd(lastPoint, 12);
             break;
-        case 'all':
+        case 'ytd':
+            selected = buildYearToDateRange(lastPoint);
+            break;
         default:
-            selected = buildCalendarYearRange(lastPoint.year);
+            selected = buildRangeFromEnd(lastPoint, 6);
             break;
     }
 
@@ -706,16 +719,19 @@ function buildRangeFromEnd(endPoint, length) {
     return months;
 }
 
-function buildCalendarYearRange(year) {
-    return Array.from({ length: 12 }, (_, index) => ({
-        year,
-        monthIndex: index,
-        key: normalizeMonthKey(year, index),
-    }));
+function buildYearToDateRange(endPoint) {
+    const months = [];
+    for (let monthIndex = 0; monthIndex <= endPoint.monthIndex; monthIndex++) {
+        months.push({
+            year: endPoint.year,
+            monthIndex,
+            key: normalizeMonthKey(endPoint.year, monthIndex),
+        });
+    }
+    return months;
 }
 
 function normalizeMonthKey(year, monthIndex) {
     const normalizedMonth = String(monthIndex + 1).padStart(2, '0');
     return `${year}-${normalizedMonth}`;
 }
-
