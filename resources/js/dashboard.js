@@ -151,15 +151,32 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 tooltip: {
                     shared: false,
+                    followCursor: true,
                     custom: ({ series, seriesIndex, dataPointIndex, w }) => {
                         const point = w.config.series[seriesIndex].data[dataPointIndex];
                         const pedidos = series[seriesIndex][dataPointIndex];
                         const monto = point.goalAmount ?? 0;
+                        const pedidosColor = '#0AB39C';
+                        const montoColor = '#405189';
                         return `
-                            <div style="padding:10px 12px;">
-                                <div class="fw-semibold mb-1">${point.x}</div>
-                                <div>Pedidos: <strong>${formatVelzonNumber(pedidos)}</strong></div>
-                                <div>Monto: <strong>${formatCurrency(monto)}</strong></div>
+                            <div class="apexcharts-tooltip-title" style="font-size:13px;font-weight:600;color:#5b6280;font-family:'Poppins',sans-serif;">
+                                ${point.x}
+                            </div>
+                            <div style="padding:8px 14px 10px;font-family:'Poppins',sans-serif;">
+                                <div class="apexcharts-tooltip-series-group apexcharts-active" style="display:flex;align-items:center;margin-bottom:8px;">
+                                    <span class="apexcharts-tooltip-marker" style="background:${pedidosColor};width:10px;height:10px;border-radius:50%;margin-right:10px;"></span>
+                                    <div class="apexcharts-tooltip-text" style="display:flex;gap:6px;font-size:12px;color:#8a94a6;">
+                                        <div class="apexcharts-tooltip-label">Pedidos:</div>
+                                        <div class="apexcharts-tooltip-value" style="color:#405189;font-weight:600;">${formatVelzonNumber(pedidos)}</div>
+                                    </div>
+                                </div>
+                                <div class="apexcharts-tooltip-series-group apexcharts-active" style="display:flex;align-items:center;">
+                                    <span class="apexcharts-tooltip-marker" style="width:12px;height:3px;border-radius:2px;background:${montoColor};margin-right:10px;"></span>
+                                    <div class="apexcharts-tooltip-text" style="display:flex;gap:6px;font-size:12px;color:#8a94a6;">
+                                        <div class="apexcharts-tooltip-label">Monto:</div>
+                                        <div class="apexcharts-tooltip-value" style="color:#405189;font-weight:600;">${formatCurrency(monto)}</div>
+                                    </div>
+                                </div>
                             </div>
                         `;
                     },
@@ -820,4 +837,3 @@ function normalizeMonthKey(year, monthIndex) {
     const normalizedMonth = String(monthIndex + 1).padStart(2, '0');
     return `${year}-${normalizedMonth}`;
 }
-
