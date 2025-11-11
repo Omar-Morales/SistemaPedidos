@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Dashboard')
 
@@ -174,7 +174,7 @@
 
 
 
-                                    <i class="ri-shopping-basket-2-line align-middle me-1"></i> Órdenes
+                                    <i class="ri-shopping-basket-2-line align-middle me-1"></i> Ordenes
 
 
                                     <span id="totalComprasTransacciones" class="ms-2">0</span>
@@ -454,31 +454,113 @@
 
 
 
-            <div class="row">
-
-                <div class="col-lg-12">
-
-                    <div class="card">
-
-                        <div class="card-body">
-
-                            <h4 class="card-title">Comparación de Ventas y Compras (Últimos 6 meses)</h4>
-
-                            <div id="ventasComprasChart"></div>
-
+        <div class="row g-3">
+                <div class="col-xxl-6">
+                    <div class="card card-height-100">
+                        <div class="card-header align-items-center d-flex flex-wrap gap-2">
+                            <h4 class="card-title mb-0 flex-grow-1">Resumen de equilibrio</h4>
+                            <div class="flex-shrink-0">
+                                <div class="dropdown card-header-dropdown">
+                                    <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                        <span class="fw-semibold text-uppercase fs-12">Ordenar por:</span>
+                                        <span class="text-muted">
+                                            <span id="ventasComprasOrdenLabel">Ultimos 6 meses</span>
+                                            <i class="mdi mdi-chevron-down ms-1"></i>
+                                        </span>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        <a class="dropdown-item ventas-compras-order" data-order="6m" href="#">Ultimos 6 meses</a>
+                                        <a class="dropdown-item ventas-compras-order" data-order="12m" href="#">Ultimos 12 meses</a>
+                                        <a class="dropdown-item ventas-compras-order" data-order="ytd" href="#">Año en curso</a>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-
+                        <div class="card-body px-0">
+                            <ul class="list-inline main-chart text-center mb-0">
+                                <li class="list-inline-item chart-border-left me-0 border-0">
+                                    <h4 class="text-primary mb-0">
+                                        <span id="ventasComparacionTotal" class="fw-normal">S/ 0.00</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ganancia</span>
+                                    </h4>
+                                </li>
+                                <li class="list-inline-item chart-border-left me-0">
+                                    <h4 class="text-danger mb-0">
+                                        <span id="comprasComparacionTotal" class="fw-normal">S/ 0.00</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Gastos</span>
+                                    </h4>
+                                </li>
+                                <li class="list-inline-item chart-border-left me-0">
+                                    <h4 class="mb-0">
+                                        <span id="ventasComparacionRatio" class="fw-normal">0%</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ratio de beneficio</span>
+                                    </h4>
+                                </li>
+                            </ul>
+                            <div id="ventasComprasChart" class="apex-charts" data-colors='["--vz-success", "--vz-danger"]'></div>
+                        </div>
                     </div>
-
                 </div>
-
+                <div class="col-xxl-6">
+                    <div class="card card-height-100">
+                        <div class="card-header align-items-center d-flex flex-wrap gap-2">
+                            <h4 class="card-title mb-0 flex-grow-1">Ganancia</h4>
+                            <div class="flex-shrink-0">
+                                <div class="dropdown card-header-dropdown">
+                                    <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                        <span class="fw-semibold text-uppercase fs-12 text-muted">Ordenar por:</span>
+                                        <span class="text-muted">
+                                            <span id="ordersPerformanceRangeLabel">Todo</span>
+                                            <i class="mdi mdi-chevron-down ms-1"></i>
+                                        </span>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        <a class="dropdown-item orders-performance-range active" data-range="all" href="#">Todo</a>
+                                        <a class="dropdown-item orders-performance-range" data-range="1m" href="#">Ultimo mes</a>
+                                        <a class="dropdown-item orders-performance-range" data-range="6m" href="#">Ultimos 6 meses</a>
+                                        <a class="dropdown-item orders-performance-range" data-range="1y" href="#">Ultimo año</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body px-0">
+                            <ul class="list-inline main-chart text-center mb-0">
+                                <li class="list-inline-item chart-border-left me-0 border-0">
+                                    <h4 class="text-primary mb-0">
+                                        <span id="ordersPerformanceOrders" class="fw-normal">0</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ordenes</span>
+                                    </h4>
+                                </li>
+                                <li class="list-inline-item chart-border-left me-0">
+                                    <h4 class="text-success mb-0">
+                                        <span id="ordersPerformanceEarnings" class="fw-normal">S/ 0.00</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ganancias</span>
+                                    </h4>
+                                </li>
+                                <li class="list-inline-item chart-border-left me-0">
+                                    <h4 class="text-danger mb-0">
+                                        <span id="ordersPerformanceRefunds" class="fw-normal">0</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Anulados</span>
+                                    </h4>
+                                </li>
+                                <li class="list-inline-item chart-border-left me-0">
+                                    <h4 class="mb-0">
+                                        <span id="ordersPerformanceConversion" class="fw-normal">0%</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ratio de conversion</span>
+                                    </h4>
+                                </li>
+                            </ul>
+                            <div id="ordersPerformanceChart" class="apex-charts"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
 
 
-            <div class="row">
+        <div class="row">
 
-                <!-- Gráfico de Ventas por Producto -->
+                <!-- Grafico de Ventas por Producto -->
 
                 <div class="col-6">
 
@@ -486,7 +568,7 @@
 
                         <div class="card-body">
 
-                            <h4 class="card-title">Distribución de Ventas por Producto</h4>
+                            <h4 class="card-title">Distribucion de Ventas por Producto</h4>
 
                             <div id="ventasProductosChart"></div>
 
@@ -496,7 +578,7 @@
 
                 </div>
 
-                <!-- Gráfico de Compras por Producto -->
+                <!-- Grafico de Compras por Producto -->
 
                 <div class="col-6">
 
@@ -504,7 +586,7 @@
 
                         <div class="card-body">
 
-                            <h4 class="card-title">Distribución de Compras por Producto</h4>
+                            <h4 class="card-title">Distribucion de Compras por Producto</h4>
 
                             <div id="comprasProductosChart"></div>
 
@@ -520,7 +602,7 @@
 
             <div class="row">
 
-                <!-- Gráfico de Top Clientes -->
+                <!-- Grafico de Top Clientes -->
 
                 <div class="col-6">
 
@@ -538,7 +620,7 @@
 
                 </div>
 
-                <!-- Gráfico de Top Proveedores -->
+                <!-- Grafico de Top Proveedores -->
 
                 <div class="col-6">
 
@@ -622,5 +704,12 @@
             margin-top: 0;
 
         }
+
     </style>
 @endpush
+
+
+
+
+
+

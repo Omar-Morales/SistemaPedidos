@@ -31,19 +31,19 @@ class DashboardController extends Controller
     public function getDashboardData()
     {
         $now = Carbon::now();
-        $sixMonthsAgo = $now->copy()->subMonths(6);
+        $comparisonStart = $now->copy()->subMonths(11)->startOfMonth();
         $startOfMonth = $now->copy()->startOfMonth();
         $endOfMonth = $now->copy()->endOfMonth();
 
         // Ventas y compras por mes (últimos 6 meses para los gráficos)
         $ventas = Venta::select(DB::raw("SUM(total_price) as total"), DB::raw("TO_CHAR(sale_date, 'YYYY-MM') as month"))
-            ->where('sale_date', '>=', $sixMonthsAgo)
+            ->where('sale_date', '>=', $comparisonStart)
             ->groupBy('month')
             ->orderBy('month')
             ->get();
 
         $compras = Compra::select(DB::raw("SUM(total_cost) as total"), DB::raw("TO_CHAR(purchase_date, 'YYYY-MM') as month"))
-            ->where('purchase_date', '>=', $sixMonthsAgo)
+            ->where('purchase_date', '>=', $comparisonStart)
             ->groupBy('month')
             ->orderBy('month')
             ->get();
@@ -164,15 +164,64 @@ class DashboardController extends Controller
             'salesTargetRemaining' => $salesTargetRemaining,
         ];
 
+        $monthsRange = [];
+        $cursor = $comparisonStart->copy();
+        while ($cursor <= $endOfMonth) {
+            $monthsRange[] = $cursor->format('Y-m');
+            $cursor->addMonth();
+        }
+
+        $ordersData = DetalleVenta::select(
+                DB::raw("TO_CHAR(ventas.sale_date, 'YYYY-MM') as month"),
+                DB::raw("SUM(CASE WHEN detalle_ventas.status IS NULL OR detalle_ventas.status != 'cancelled' THEN 1 ELSE 0 END) as orders"),
+                DB::raw("SUM(CASE WHEN detalle_ventas.status = 'cancelled' THEN 1 ELSE 0 END) as refunds")
+            )
+            ->join('ventas', 'ventas.id', '=', 'detalle_ventas.sale_id')
+            ->where('ventas.sale_date', '>=', $comparisonStart)
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get()
+            ->keyBy('month');
+
+        $ventasMap = $ventas->pluck('total', 'month');
+        $ordersSeries = [];
+        $earningsSeries = [];
+        $refundsSeries = [];
+        foreach ($monthsRange as $month) {
+            $ordersSeries[] = (int) ($ordersData[$month]->orders ?? 0);
+            $refundsSeries[] = (int) ($ordersData[$month]->refunds ?? 0);
+            $earningsSeries[] = (float) ($ventasMap[$month] ?? 0);
+        }
+
+        $ordersTotal = array_sum($ordersSeries);
+        $earningsTotal = array_sum($earningsSeries);
+        $refundsTotal = array_sum($refundsSeries);
+        $conversionRatio = $ordersTotal > 0 ? (($ordersTotal - $refundsTotal) / $ordersTotal) * 100 : 0;
+
+        $ordersSummary = [
+            'months' => $monthsRange,
+            'orders' => $ordersSeries,
+            'earnings' => $earningsSeries,
+            'refunds' => $refundsSeries,
+            'totals' => [
+                'orders' => $ordersTotal,
+                'earnings' => $earningsTotal,
+                'refunds' => $refundsTotal,
+                'conversion' => round($conversionRatio, 2),
+            ],
+        ];
+
         return response()->json([
             'ventas' => $ventas,
             'compras' => $compras,
+            'monthsRange' => $monthsRange,
             'metrics' => $metrics,
             'stats' => $stats,
             'ventasProductos' => $ventasProductos,
             'comprasProductos' => $comprasProductos,
             'topClientes' => $topClientes,
             'topProveedores' => $topProveedores,
+            'ordersSummary' => $ordersSummary,
         ]);
     }
 }
