@@ -299,15 +299,15 @@ function buildOrdersPerformanceOptions(categories, ordersData, earningsData, ref
             },
         },
         markers: {
-            size: [0, 4, 0],
+            size: [4, 4, 4],
             strokeColors: '#fff',
             strokeWidth: 2,
             hover: { sizeOffset: 3 },
         },
         dataLabels: { enabled: false },
         series: [
-            { name: 'Ordenes', type: 'column', data: ordersData, yAxisIndex: 1 },
-            { name: 'Ganancias', type: 'area', data: earningsData, yAxisIndex: 0 },
+            { name: 'Ganancias', type: 'column', data: earningsData, yAxisIndex: 0 },
+            { name: 'Ordenes', type: 'line', data: ordersData, yAxisIndex: 1 },
             { name: 'Anulados', type: 'line', data: refundsData, yAxisIndex: 1 },
         ],
         colors: ['#47ad77', '#5A8DEE', '#F1734F'],
@@ -354,8 +354,8 @@ function buildOrdersPerformanceOptions(categories, ordersData, earningsData, ref
             shared: true,
             intersect: false,
             y: [
-                { formatter: val => `${val} ordenes` },
                 { formatter: val => formatCurrency(val) },
+                { formatter: val => `${val} ordenes` },
                 { formatter: val => `${val} anulados` },
             ],
         },

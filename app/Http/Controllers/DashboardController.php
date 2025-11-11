@@ -184,13 +184,16 @@ class DashboardController extends Controller
             ->keyBy('month');
 
         $ventasMap = $ventas->pluck('total', 'month');
+        $comprasMap = $compras->pluck('total', 'month');
         $ordersSeries = [];
         $earningsSeries = [];
         $refundsSeries = [];
         foreach ($monthsRange as $month) {
+            $ventasTotal = (float) ($ventasMap[$month] ?? 0);
+            $comprasTotal = (float) ($comprasMap[$month] ?? 0);
             $ordersSeries[] = (int) ($ordersData[$month]->orders ?? 0);
             $refundsSeries[] = (int) ($ordersData[$month]->refunds ?? 0);
-            $earningsSeries[] = (float) ($ventasMap[$month] ?? 0);
+            $earningsSeries[] = $ventasTotal - $comprasTotal;
         }
 
         $ordersTotal = array_sum($ordersSeries);

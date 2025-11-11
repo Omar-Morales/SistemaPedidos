@@ -481,19 +481,19 @@
                                 <li class="list-inline-item chart-border-left me-0 border-0">
                                     <h4 class="text-primary mb-0">
                                         <span id="ventasComparacionTotal" class="fw-normal">S/ 0.00</span>
-                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ganancia</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ventas</span>
                                     </h4>
                                 </li>
                                 <li class="list-inline-item chart-border-left me-0">
                                     <h4 class="text-danger mb-0">
                                         <span id="comprasComparacionTotal" class="fw-normal">S/ 0.00</span>
-                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Gastos</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Compras</span>
                                     </h4>
                                 </li>
                                 <li class="list-inline-item chart-border-left me-0">
                                     <h4 class="mb-0">
                                         <span id="ventasComparacionRatio" class="fw-normal">0%</span>
-                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ratio de beneficio</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Beneficio</span>
                                     </h4>
                                 </li>
                             </ul>
