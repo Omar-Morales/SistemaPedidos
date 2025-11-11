@@ -140,23 +140,35 @@ function renderResumenChart(chartInstance, ventas, compras, range, timeline = []
 }
 
 function buildResumenChartOptions(categories = [], ventasData = [], comprasData = []) {
+    const palette = ['#34c38f', '#f46a6a'];
     return {
         chart: { type: 'area', height: 365, toolbar: { show: false } },
-        stroke: { curve: 'smooth', width: 2 },
+        stroke: {
+            curve: 'smooth',
+            width: 3,
+            colors: palette,
+        },
         fill: {
             type: 'gradient',
-            gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0, stops: [0, 80, 100] }
+            gradient: {
+                shadeIntensity: 1,
+                gradientToColors: palette,
+                inverseColors: false,
+                opacityFrom: 0.75,
+                opacityTo: 0.25,
+                stops: [0, 90, 100],
+            },
         },
         dataLabels: { enabled: false },
         series: [
             { name: 'Ventas', data: ventasData },
-            { name: 'Compras', data: comprasData }
+            { name: 'Compras', data: comprasData },
         ],
-        colors: ['#34c38f', '#f46a6a'],
+        colors: palette,
         xaxis: { categories },
         yaxis: { labels: { formatter: value => `S/ ${Number(value).toLocaleString('es-PE')}` } },
         legend: { position: 'bottom', horizontalAlign: 'center' },
-        grid: { borderColor: 'transparent' }
+        grid: { borderColor: 'transparent' },
     };
 }
 
