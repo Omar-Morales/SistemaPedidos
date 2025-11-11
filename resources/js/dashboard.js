@@ -1,4 +1,4 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 
 axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]').content;
 
@@ -92,16 +92,77 @@ document.addEventListener('DOMContentLoaded', function () {
                 fallback: data.comprasProductos ?? [],
                 defaultRange: distributionDefaultRange,
             });
-            // Top clientes
-            const clientes = data.topClientes.map(c => c.cliente);
-            const ventasClientes = data.topClientes.map(c => Number(c.total_ventas));
+            // Top clientes (barra horizontal con marcador de montos, doble escala)
+            const clientesData = data.topClientes ?? [];
+            const pedidosValues = clientesData.map(item => Number(item.total_pedidos ?? 0));
+            const montosValues = clientesData.map(item => Number(item.total_ventas ?? 0));
+            const maxPedidos = Math.max(...pedidosValues, 1);
+            const maxMontos = Math.max(...montosValues, 1);
+            const amountScale = maxPedidos > 0 ? maxMontos / maxPedidos : 1;
+            const pedidosAxisMax = Math.max(5, Math.ceil(maxPedidos / 5) * 5);
+            const pedidosTickAmount = Math.max(1, Math.round(pedidosAxisMax / 5));
+
+            const topClientesSeries = clientesData.map((item, idx) => ({
+                x: item.cliente,
+                y: pedidosValues[idx],
+                goalAmount: montosValues[idx],
+                goals: [
+                    {
+                        name: 'Monto',
+                        value: montosValues[idx] / amountScale,
+                        strokeHeight: 5,
+                        strokeColor: '#405189',
+                    },
+                ],
+            }));
 
             new ApexCharts(document.querySelector("#topClientesChart"), {
-                chart: { type: 'bar', height: 350 },
-                series: [{ name: 'Ventas', data: ventasClientes }],
-                xaxis: { categories: clientes },
-                yaxis: { title: { text: "Monto ($)" } },
-                colors: ['#008FFB']
+                chart: { type: 'bar', height: 360, toolbar: { show: false } },
+                series: [{ name: 'Pedidos', data: topClientesSeries }],
+                plotOptions: {
+                    bar: {
+                        horizontal: true,
+                        barHeight: '70%',
+                        borderRadius: 6,
+                        colors: { ranges: [{ from: 0, to: Number.MAX_VALUE, color: '#0AB39C' }] },
+                    },
+                },
+                dataLabels: {
+                    enabled: true,
+                    formatter: val => formatVelzonNumber(val),
+                    style: { colors: ['#fff'], fontSize: '13px', fontWeight: 500 },
+                },
+                xaxis: {
+                    labels: {
+                        formatter: val => Math.round(Number(val)).toLocaleString('es-PE'),
+                    },
+                    title: { text: 'Pedidos' },
+                    tickAmount: pedidosTickAmount,
+                    min: 0,
+                    max: pedidosAxisMax,
+                    decimalsInFloat: 0,
+                },
+                legend: {
+                    show: true,
+                    position: 'top',
+                    horizontalAlign: 'left',
+                    markers: { width: 10, height: 10, radius: 50 },
+                },
+                tooltip: {
+                    shared: false,
+                    custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                        const point = w.config.series[seriesIndex].data[dataPointIndex];
+                        const pedidos = series[seriesIndex][dataPointIndex];
+                        const monto = point.goalAmount ?? 0;
+                        return `
+                            <div style="padding:10px 12px;">
+                                <div class="fw-semibold mb-1">${point.x}</div>
+                                <div>Pedidos: <strong>${formatVelzonNumber(pedidos)}</strong></div>
+                                <div>Monto: <strong>${formatCurrency(monto)}</strong></div>
+                            </div>
+                        `;
+                    },
+                },
             }).render();
 
             // Top proveedores
@@ -181,7 +242,7 @@ function labelForRange(range) {
         case '12m':
             return 'Ultimos 12 meses';
         case 'ytd':
-            return 'Año en curso';
+            return 'AÃ±o en curso';
         default:
             return 'Ultimos 6 meses';
     }
@@ -246,7 +307,7 @@ function labelForOrdersPerformanceRange(range) {
         case '12m':
             return 'Ultimos 12 meses';
         case 'ytd':
-            return 'Año en curso';
+            return 'AÃ±o en curso';
         default:
             return 'Ultimos 6 meses';
     }
@@ -322,16 +383,16 @@ function initEchartsPieChart(containerId, labels = [], values = [], colors = [])
             backgroundColor: '#fff',
             borderColor: '#edf1f7',
             borderWidth: 1,
-            textStyle: { color: '#212529', fontSize: 13, fontWeight: 500 },
+            textStyle: { color: '#212529', fontSize: 12, fontWeight: 500 },
             padding: 11,
             formatter: params => {
                 const marker = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${params.color};margin-right:8px;"></span>`;
                 return `
-                    <div style="font-size:13px; font-weight:500; color:#495057; margin-bottom:4px;">${params.name}</div>
+                    <div style="font-size:12px; font-weight:500; color:#495057; margin-bottom:4px;">${params.name}</div>
                     <div style="display:flex; align-items:center; font-size:13px; color:#8a96a3;">
                         ${marker}
                         <span style="margin-right:6px;">Cantidad:</span>
-                        <span style="color:#111927; font-size:14px;">${formatVelzonNumber(params.value)}</span>
+                        <span style="color:#111927; font-size:12px;">${formatVelzonNumber(params.value)}</span>
                     </div>
                 `.trim();
             },
@@ -451,7 +512,7 @@ function labelForDistributionRange(range) {
         case '12m':
             return 'Ultimos 12 meses';
         case 'ytd':
-            return 'Año en curso';
+            return 'AÃ±o en curso';
         case '6m':
         default:
             return 'Ultimos 6 meses';
@@ -593,7 +654,7 @@ function animateCounter(elementId, endValue, duration = 500) {
         return;
     }
 
-    // Mostrar el wrapper del número
+    // Mostrar el wrapper del nÃºmero
     const wrapper = el.closest('h2');
     if (wrapper && wrapper.classList.contains('opacity-0')) {
         wrapper.classList.remove('opacity-0');
@@ -758,3 +819,4 @@ function normalizeMonthKey(year, monthIndex) {
     const normalizedMonth = String(monthIndex + 1).padStart(2, '0');
     return `${year}-${normalizedMonth}`;
 }
+

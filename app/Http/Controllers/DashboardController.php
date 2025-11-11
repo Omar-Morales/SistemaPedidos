@@ -129,9 +129,11 @@ class DashboardController extends Controller
         // Top clientes y proveedores
         $topClientes = Venta::select(
                 'customers.name as cliente',
-                DB::raw('SUM(ventas.total_price) as total_ventas')
+                DB::raw('SUM(ventas.total_price) as total_ventas'),
+                DB::raw('COUNT(detalle_ventas.id) as total_pedidos')
             )
             ->join('customers', 'ventas.customer_id', '=', 'customers.id')
+            ->join('detalle_ventas', 'detalle_ventas.sale_id', '=', 'ventas.id')
             ->groupBy('customers.name')
             ->orderByDesc('total_ventas')
             ->limit(5)
