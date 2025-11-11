@@ -115,7 +115,6 @@ body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link {
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link i {
     color: inherit;
     transition: color 0.15s ease;
-    font-weight: 500;
 }
 
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover,
@@ -127,7 +126,6 @@ body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:foc
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover i,
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus i {
     color: #1f3a74;
-    font-weight: 500;
 }
 
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active {
@@ -137,7 +135,6 @@ body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-
 
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active i {
     color: #1f3a74;
-    font-weight: 500;
 }
 .app-menu .navbar-nav {
     gap: 6px;
@@ -228,5 +225,5 @@ html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navb
 html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus i,
 html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active i {
     color: #fff !important;
-    font-weight: 500;
 }
+

@@ -443,3 +443,63 @@ html[data-layout-mode="dark"] .select2-container--bootstrap-5.select2-container-
 .summary-card .counter-value {
     font-weight: 600;        /* opcional */
 }
+
+/* Menú lateral (solo panel expandido) */
+body:not(.vertical-sidebar-enable) .app-menu .navbar-nav {
+    gap: 6px;
+    padding-left: 0;
+}
+
+body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 18px;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #5a6178;
+    background: transparent;
+    transition: color 0.15s ease, font-weight 0.15s ease;
+}
+
+body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link i {
+    color: inherit;
+    transition: color 0.15s ease;
+    font-weight: 500;
+}
+
+body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover,
+body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus {
+    color: #1f3a74;
+    font-weight: 700;
+}
+
+body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover i,
+body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus i {
+    color: #1f3a74;
+    font-weight: 500;
+}
+
+body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active {
+    color: #1f3a74;
+    font-weight: 700;
+}
+
+body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active i {
+    color: #1f3a74;
+    font-weight: 500;
+}
+
+html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover,
+html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus,
+html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active {
+    color: #fff;
+}
+
+html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover i,
+html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus i,
+html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active i {
+    color: #fff;
+    font-weight: 500;
+}
