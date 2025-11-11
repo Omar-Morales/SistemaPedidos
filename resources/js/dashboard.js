@@ -101,6 +101,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const amountScale = maxPedidos > 0 ? maxMontos / maxPedidos : 1;
             const pedidosAxisMax = Math.max(5, Math.ceil(maxPedidos / 5) * 5);
             const pedidosTickAmount = Math.max(1, Math.round(pedidosAxisMax / 5));
+            const pedidosColor = '#0AB39C';
+            const montoColor = '#405189';
 
             const topClientesSeries = clientesData.map((item, idx) => ({
                 x: item.cliente,
@@ -117,15 +119,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 ],
             }));
 
-            new ApexCharts(document.querySelector("#topClientesChart"), {
+            const topClientesChartEl = document.querySelector("#topClientesChart");
+            const topClientesChart = new ApexCharts(topClientesChartEl, {
                 chart: { type: 'bar', height: 360, toolbar: { show: false } },
+                colors: [pedidosColor],
                 series: [{ name: 'Pedidos', data: topClientesSeries }],
                 plotOptions: {
                     bar: {
                         horizontal: true,
                         barHeight: '70%',
                         borderRadius: 6,
-                        colors: { ranges: [{ from: 0, to: Number.MAX_VALUE, color: '#0AB39C' }] },
+                        colors: { ranges: [{ from: 0, to: Number.MAX_VALUE, color: pedidosColor }] },
                     },
                 },
                 dataLabels: {
@@ -137,7 +141,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     labels: {
                         formatter: val => Math.round(Number(val)).toLocaleString('es-PE'),
                     },
-                    title: { text: 'Pedidos' },
                     tickAmount: pedidosTickAmount,
                     min: 0,
                     max: pedidosAxisMax,
@@ -145,9 +148,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 legend: {
                     show: true,
-                    position: 'top',
-                    horizontalAlign: 'left',
-                    markers: { width: 10, height: 10, radius: 50 },
+                    showForSingleSeries: true,
+                    position: 'bottom',
+                    horizontalAlign: 'center',
+                    markers: { width: 10, height: 10 },
+                    labels: { colors: '#6c757d' },
+                    itemMargin: { horizontal: 12 },
+                    onItemClick: { toggleDataSeries: false },
                 },
                 tooltip: {
                     shared: false,
@@ -156,8 +163,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         const point = w.config.series[seriesIndex].data[dataPointIndex];
                         const pedidos = series[seriesIndex][dataPointIndex];
                         const monto = point.goalAmount ?? 0;
-                        const pedidosColor = '#0AB39C';
-                        const montoColor = '#405189';
                         return `
                             <div class="apexcharts-tooltip-title" style="font-size:13px;font-weight:600;color:#5b6280;font-family:'Poppins',sans-serif;">
                                 ${point.x}
@@ -181,7 +186,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         `;
                     },
                 },
-            }).render();
+            });
+            topClientesChart.render().then(() => {
+                enhanceTopClientesLegend(topClientesChartEl, pedidosColor, montoColor);
+            });
 
             // Top proveedores
             const proveedores = data.topProveedores.map(p => p.proveedor);
@@ -217,6 +225,52 @@ function renderResumenChart(chartInstance, ventas, compras, range, timeline = []
     updateText('comprasComparacionTotal', formatCompactCurrency(totalCompras));
     updateText('ventasComparacionRatio', `${ratio.toFixed(1)}%`);
 }
+
+function enhanceTopClientesLegend(container, pedidosColor, montoColor) {
+    if (!container) {
+        return;
+    }
+    const legend = container.querySelector('.apexcharts-legend');
+    if (!legend) {
+        setTimeout(() => enhanceTopClientesLegend(container, pedidosColor, montoColor), 120);
+        return;
+    }
+    if (legend.dataset.enhanced === 'true') {
+        return;
+    }
+    legend.dataset.enhanced = 'true';
+
+    const pedidosSeries = legend.querySelector('.apexcharts-legend-series');
+    if (pedidosSeries) {
+        const marker = pedidosSeries.querySelector('.apexcharts-legend-marker');
+        if (marker) {
+            marker.classList.add('legend-dot');
+            marker.style.width = '12px';
+            marker.style.height = '12px';
+            marker.style.borderRadius = '4px';
+            marker.style.background = pedidosColor;
+            marker.style.borderColor = pedidosColor;
+        }
+        const text = pedidosSeries.querySelector('.apexcharts-legend-text');
+        if (text) {
+            text.textContent = 'Pedidos';
+        }
+    }
+
+    const montoSerie = pedidosSeries ? pedidosSeries.cloneNode(true) : document.createElement('div');
+    montoSerie.classList.add('legend-monto');
+    const montoMarker = montoSerie.querySelector('.apexcharts-legend-marker');
+    if (montoMarker) {
+        montoMarker.style.background = montoColor;
+        montoMarker.style.borderColor = montoColor;
+    }
+    const montoText = montoSerie.querySelector('.apexcharts-legend-text');
+    if (montoText) {
+        montoText.textContent = 'Monto';
+    }
+    legend.appendChild(montoSerie);
+}
+
 
 function buildResumenChartOptions(categories = [], ventasData = [], comprasData = []) {
     const palette = ['#34c38f', '#f46a6a'];

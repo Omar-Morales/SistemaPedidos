@@ -744,12 +744,31 @@
 
         }
 
+        #topClientesChart .apexcharts-legend {
+            display: flex !important;
+            justify-content: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            margin-top: 0.75rem;
+        }
+
+        #topClientesChart .apexcharts-legend-series {
+            display: inline-flex !important;
+            align-items: center;
+            gap: 0.4rem;
+            color: #6c757d;
+            font-size: 13px;
+        }
+
+        #topClientesChart .apexcharts-legend-marker.legend-dot {
+            width: 12px !important;
+            height: 12px !important;
+            border-radius: 4px;
+            border: none !important;
+            display: inline-block;
+        }
+
+
+
     </style>
 @endpush
-
-
-
-
-
-
-
