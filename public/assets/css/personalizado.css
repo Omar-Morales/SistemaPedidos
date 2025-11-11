@@ -503,3 +503,29 @@ html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navb
     color: #fff;
     font-weight: 500;
 }
+
+body.vertical-sidebar-enable .app-menu .navbar-nav .nav-link.menu-link:hover,
+body.vertical-sidebar-enable .app-menu .navbar-nav .nav-link.menu-link:focus {
+    color: #fff !important;
+}
+
+body.vertical-sidebar-enable .app-menu .navbar-nav .nav-link.menu-link:hover i,
+body.vertical-sidebar-enable .app-menu .navbar-nav .nav-link.menu-link:focus i {
+    color: #fff !important;
+}
+
+body.vertical-sidebar-enable .app-menu .navbar-nav .nav-link.menu-link:hover span,
+body.vertical-sidebar-enable .app-menu .navbar-nav .nav-link.menu-link:focus span {
+    color: #fff !important;
+    font-weight: 600;
+}
+
+[data-layout="vertical"][data-sidebar-size="sm"] .app-menu .navbar-nav .nav-link.menu-link:hover,
+[data-layout="vertical"][data-sidebar-size="sm"] .app-menu .navbar-nav .nav-link.menu-link:focus {
+    color: #fff !important;
+}
+
+[data-layout="vertical"][data-sidebar-size="sm"] .app-menu .navbar-nav .nav-link.menu-link:hover i,
+[data-layout="vertical"][data-sidebar-size="sm"] .app-menu .navbar-nav .nav-link.menu-link:focus i {
+    color: #fff !important;
+}
