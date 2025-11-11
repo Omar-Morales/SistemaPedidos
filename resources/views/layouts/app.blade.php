@@ -17,6 +17,11 @@
         })();
     </script>
     @include('partials.head')
+    <style>
+        .page-content {
+            padding-top: 75px !important;
+        }
+    </style>
     @vite(['resources/js/app.js']) <!-- o @mix si usas Mix -->
 </head>
 
