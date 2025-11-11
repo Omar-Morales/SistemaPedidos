@@ -500,7 +500,8 @@ function buildOrdersPerformanceOptions(categories, ordersData, earningsData, ref
         stroke: {
             width: [0, 3, 3],
             curve: 'smooth',
-            dashArray: [0, 0, 4],
+            colors: ['#47ad77', '#c5c9d1', '#c5c9d1'],
+            dashArray: [0, 0, 0],
         },
         fill: {
             opacity: [1, 0.12, 1],
@@ -513,9 +514,10 @@ function buildOrdersPerformanceOptions(categories, ordersData, earningsData, ref
             },
         },
         markers: {
-            size: [4, 4, 4],
-            strokeColors: '#fff',
+            size: [3, 3, 3],
+            strokeColors: ['#47ad77', '#5A8DEE', '#F1734F'],
             strokeWidth: 2,
+            colors: ['#47ad77', '#5A8DEE', '#F1734F'],
             hover: { sizeOffset: 3 },
         },
         dataLabels: { enabled: false },
@@ -524,7 +526,7 @@ function buildOrdersPerformanceOptions(categories, ordersData, earningsData, ref
             { name: 'Ordenes', type: 'line', data: ordersData, yAxisIndex: 1 },
             { name: 'Anulados', type: 'line', data: refundsData, yAxisIndex: 1 },
         ],
-        colors: ['#47ad77', '#5A8DEE', '#F1734F'],
+        colors: ['#47ad77', '#bfc5d2', '#bfc5d2'],
         xaxis: {
             categories,
             axisTicks: { show: false },
@@ -532,6 +534,15 @@ function buildOrdersPerformanceOptions(categories, ordersData, earningsData, ref
             labels: {
                 style: { colors: '#98a6ad' },
             },
+        },
+        annotations: {
+            yaxis: [
+                {
+                    y: 0,
+                    borderColor: '#adb5bd',
+                    strokeDashArray: 4,
+                },
+            ],
         },
         yaxis: [
             {
