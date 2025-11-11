@@ -747,7 +747,7 @@ function buildOrdersPerformanceOptions(categories, ordersData, earningsData, ref
         dataLabels: { enabled: false },
         series: [
             { name: 'Ganancias', type: 'column', data: earningsData, yAxisIndex: 0 },
-            { name: 'Ordenes', type: 'line', data: ordersData, yAxisIndex: 1 },
+            { name: 'Pedidos', type: 'line', data: ordersData, yAxisIndex: 1 },
             { name: 'Anulados', type: 'line', data: refundsData, yAxisIndex: 1 },
         ],
         colors: ['#47ad77', '#5A8DEE', '#F1734F'],

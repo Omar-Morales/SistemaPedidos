@@ -626,7 +626,7 @@
                                 <li class="list-inline-item chart-border-left me-0 border-0">
                                     <h4 class="text-primary mb-0">
                                         <span id="ordersPerformanceOrders" class="fw-normal">0</span>
-                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ordenes</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Pedidos</span>
                                     </h4>
                                 </li>
                                 <li class="list-inline-item chart-border-left me-0">
