@@ -110,7 +110,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     {
                         name: 'Monto',
                         value: montosValues[idx] / amountScale,
-                        strokeHeight: 5,
+                        strokeHeight: 15,
+                        strokeWidth: 5,
                         strokeColor: '#405189',
                     },
                 ],
