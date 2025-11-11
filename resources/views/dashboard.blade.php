@@ -372,7 +372,8 @@
 
                                 <span class="badge bg-soft-success text-success mb-3">
 
-                                    <span><i class="ri-money-dollar-circle-line align-middle me-1"></i> Ganancia del Mes </span>
+                                    <span><i class="ri-money-dollar-circle-line align-middle me-1"></i> Ganancia del Mes
+                                    </span>
 
                             </div>
 
@@ -450,18 +451,104 @@
 
 
 
+            <div class="row g-3">
 
+                <div class="col-lg-6">
 
+                    <div class="card card-height-100">
 
+                        <div class="card-header align-items-center d-flex flex-wrap gap-2">
 
-        <div class="row g-3">
+                            <h4 class="card-title mb-0 flex-grow-1">Top 5 Tiendas con más Pedidos</h4>
+
+                            <div class="flex-shrink-0">
+
+                                <div class="dropdown card-header-dropdown">
+                                    <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown"
+                                        aria-haspopup="true" aria-expanded="false">
+                                        <span class="fw-semibold text-uppercase fs-12">Ordenar por:</span>
+                                        <span class="text-muted">
+                                            <span id="topClientesRangeLabel">Ultimos 6 meses</span>
+                                            <i class="mdi mdi-chevron-down ms-1"></i>
+                                        </span>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        <a class="dropdown-item top-clientes-range" data-range="1m" href="#">Ultimo
+                                            mes</a>
+                                        <a class="dropdown-item top-clientes-range active" data-range="6m"
+                                            href="#">Ultimos 6 meses</a>
+                                        <a class="dropdown-item top-clientes-range" data-range="12m"
+                                            href="#">Ultimos 12
+                                            meses</a>
+                                        <a class="dropdown-item top-clientes-range" data-range="ytd" href="#">Año
+                                            en
+                                            curso</a>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="card-body">
+                            <div id="topClientesChart"></div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="col-lg-6">
+
+                    <div class="card card-height-100">
+
+                        <div class="card-header align-items-center d-flex flex-wrap gap-2">
+                            <h4 class="card-title mb-0 flex-grow-1">Distribucion de Ventas por Producto</h4>
+
+                            <div class="flex-shrink-0">
+                                <div class="dropdown card-header-dropdown">
+                                    <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown"
+                                        aria-haspopup="true" aria-expanded="false">
+                                        <span class="fw-semibold text-uppercase fs-12">Ordenar por:</span>
+                                        <span class="text-muted">
+                                            <span id="ventasDistribucionOrdenLabel">Ultimos 6 meses</span>
+                                            <i class="mdi mdi-chevron-down ms-1"></i>
+                                        </span>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        <a class="dropdown-item ventas-distribucion-order" data-range="1m"
+                                            href="#">Ultimo mes</a>
+                                        <a class="dropdown-item ventas-distribucion-order" data-range="6m"
+                                            href="#">Ultimos 6 meses</a>
+                                        <a class="dropdown-item ventas-distribucion-order" data-range="12m"
+                                            href="#">Ultimos 12 meses</a>
+                                        <a class="dropdown-item ventas-distribucion-order" data-range="ytd"
+                                            href="#">Año en curso</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                        <div class="card-body">
+                            <div id="ventasProductosChart" style="height:320px;"></div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="row g-3">
                 <div class="col-xxl-6">
                     <div class="card card-height-100">
                         <div class="card-header align-items-center d-flex flex-wrap gap-2">
                             <h4 class="card-title mb-0 flex-grow-1">Resumen de equilibrio</h4>
                             <div class="flex-shrink-0">
                                 <div class="dropdown card-header-dropdown">
-                                    <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown"
+                                        aria-haspopup="true" aria-expanded="false">
                                         <span class="fw-semibold text-uppercase fs-12">Ordenar por:</span>
                                         <span class="text-muted">
                                             <span id="ventasComprasOrdenLabel">Ultimos 6 meses</span>
@@ -469,10 +556,14 @@
                                         </span>
                                     </a>
                                     <div class="dropdown-menu dropdown-menu-end">
-                                        <a class="dropdown-item ventas-compras-order" data-order="1m" href="#">Ultimo mes</a>
-                                        <a class="dropdown-item ventas-compras-order" data-order="6m" href="#">Ultimos 6 meses</a>
-                                        <a class="dropdown-item ventas-compras-order" data-order="12m" href="#">Ultimos 12 meses</a>
-                                        <a class="dropdown-item ventas-compras-order" data-order="ytd" href="#">Año en curso</a>
+                                        <a class="dropdown-item ventas-compras-order" data-order="1m"
+                                            href="#">Ultimo mes</a>
+                                        <a class="dropdown-item ventas-compras-order" data-order="6m"
+                                            href="#">Ultimos 6 meses</a>
+                                        <a class="dropdown-item ventas-compras-order" data-order="12m"
+                                            href="#">Ultimos 12 meses</a>
+                                        <a class="dropdown-item ventas-compras-order" data-order="ytd" href="#">Año
+                                            en curso</a>
                                     </div>
                                 </div>
                             </div>
@@ -498,7 +589,8 @@
                                     </h4>
                                 </li>
                             </ul>
-                            <div id="ventasComprasChart" class="apex-charts" data-colors='["--vz-success", "--vz-danger"]'></div>
+                            <div id="ventasComprasChart" class="apex-charts"
+                                data-colors='["--vz-success", "--vz-danger"]'></div>
                         </div>
                     </div>
                 </div>
@@ -508,7 +600,8 @@
                             <h4 class="card-title mb-0 flex-grow-1">Ganancia</h4>
                             <div class="flex-shrink-0">
                                 <div class="dropdown card-header-dropdown">
-                                    <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown"
+                                        aria-haspopup="true" aria-expanded="false">
                                         <span class="fw-semibold text-uppercase fs-12">Ordenar por:</span>
                                         <span class="text-muted">
                                             <span id="ordersPerformanceRangeLabel">Ultimos 6 meses</span>
@@ -516,10 +609,14 @@
                                         </span>
                                     </a>
                                     <div class="dropdown-menu dropdown-menu-end">
-                                        <a class="dropdown-item orders-performance-range" data-range="1m" href="#">Ultimo mes</a>
-                                        <a class="dropdown-item orders-performance-range active" data-range="6m" href="#">Ultimos 6 meses</a>
-                                        <a class="dropdown-item orders-performance-range" data-range="12m" href="#">Ultimos 12 meses</a>
-                                        <a class="dropdown-item orders-performance-range" data-range="ytd" href="#">Año en curso</a>
+                                        <a class="dropdown-item orders-performance-range" data-range="1m"
+                                            href="#">Ultimo mes</a>
+                                        <a class="dropdown-item orders-performance-range active" data-range="6m"
+                                            href="#">Ultimos 6 meses</a>
+                                        <a class="dropdown-item orders-performance-range" data-range="12m"
+                                            href="#">Ultimos 12 meses</a>
+                                        <a class="dropdown-item orders-performance-range" data-range="ytd"
+                                            href="#">Año en curso</a>
                                     </div>
                                 </div>
                             </div>
@@ -547,7 +644,8 @@
                                 <li class="list-inline-item chart-border-left me-0">
                                     <h4 class="mb-0">
                                         <span id="ordersPerformanceConversion" class="fw-normal">0%</span>
-                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ratio de conversion</span>
+                                        <span class="text-muted d-inline-block fs-13 align-middle ms-2">Ratio de
+                                            conversion</span>
                                     </h4>
                                 </li>
                             </ul>
@@ -556,153 +654,6 @@
                     </div>
                 </div>
             </div>
-
-
-
-        <div class="row">
-
-                <!-- Grafico de Ventas por Producto -->
-
-                <div class="col-6">
-
-                    <div class="card card-height-100">
-
-                        <div class="card-header align-items-center d-flex flex-wrap gap-2">
-                            <h4 class="card-title mb-0 flex-grow-1">Distribucion de Ventas por Producto</h4>
-
-                            <div class="flex-shrink-0">
-                                <div class="dropdown card-header-dropdown">
-                                    <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                        <span class="fw-semibold text-uppercase fs-12">Ordenar por:</span>
-                                        <span class="text-muted">
-                                            <span id="ventasDistribucionOrdenLabel">Ultimos 6 meses</span>
-                                            <i class="mdi mdi-chevron-down ms-1"></i>
-                                        </span>
-                                    </a>
-                                    <div class="dropdown-menu dropdown-menu-end">
-                                        <a class="dropdown-item ventas-distribucion-order" data-range="1m" href="#">Ultimo mes</a>
-                                        <a class="dropdown-item ventas-distribucion-order" data-range="6m" href="#">Ultimos 6 meses</a>
-                                        <a class="dropdown-item ventas-distribucion-order" data-range="12m" href="#">Ultimos 12 meses</a>
-                                        <a class="dropdown-item ventas-distribucion-order" data-range="ytd" href="#">Año en curso</a>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-                        <div class="card-body">
-                            <div id="ventasProductosChart" style="height:320px;"></div>
-                        </div>
-
-                    </div>
-
-                </div>
-
-                <!-- Grafico de Compras por Producto -->
-
-                <div class="col-6">
-
-                    <div class="card card-height-100">
-
-                        <div class="card-header align-items-center d-flex flex-wrap gap-2">
-                            <h4 class="card-title mb-0 flex-grow-1">Distribucion de Compras por Producto</h4>
-                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <span class="text-muted text-uppercase fw-semibold fs-12">Ordenar por:</span>
-                                <div class="dropdown">
-                                    <a class="text-decoration-none fw-semibold text-primary" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                        <span id="comprasDistribucionOrdenLabel">Ultimos 6 meses</span>
-                                        <i class="ri-arrow-down-s-line align-middle ms-1"></i>
-                                    </a>
-                                    <div class="dropdown-menu dropdown-menu-end">
-                                        <a class="dropdown-item compras-distribucion-order" data-range="1m" href="#">Ultimo mes</a>
-                                        <a class="dropdown-item compras-distribucion-order" data-range="6m" href="#">Ultimos 6 meses</a>
-                                        <a class="dropdown-item compras-distribucion-order" data-range="12m" href="#">Ultimos 12 meses</a>
-                                        <a class="dropdown-item compras-distribucion-order" data-range="ytd" href="#">Año en curso</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card-body">
-                            <div id="comprasProductosChart" style="height:320px;"></div>
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
-
-            <div class="row">
-
-                <!-- Grafico de Top Clientes -->
-
-                <div class="col-6">
-
-                    <div class="card card-height-100">
-
-                        <div class="card-header align-items-center d-flex flex-wrap gap-2">
-
-                            <h4 class="card-title mb-0 flex-grow-1">Top 5 Tiendas con más Pedidos</h4>
-
-                            <div class="flex-shrink-0">
-
-                                <div class="dropdown card-header-dropdown">
-                                    <a class="text-reset dropdown-btn" href="#" data-bs-toggle="dropdown"
-                                        aria-haspopup="true" aria-expanded="false">
-                                        <span class="fw-semibold text-uppercase fs-12">Ordenar por:</span>
-                                        <span class="text-muted">
-                                            <span id="topClientesRangeLabel">Ultimos 6 meses</span>
-                                            <i class="mdi mdi-chevron-down ms-1"></i>
-                                        </span>
-                                    </a>
-                                    <div class="dropdown-menu dropdown-menu-end">
-                                        <a class="dropdown-item top-clientes-range" data-range="1m" href="#">Ultimo
-                                            mes</a>
-                                        <a class="dropdown-item top-clientes-range active" data-range="6m"
-                                            href="#">Ultimos 6 meses</a>
-                                        <a class="dropdown-item top-clientes-range" data-range="12m" href="#">Ultimos 12
-                                            meses</a>
-                                        <a class="dropdown-item top-clientes-range" data-range="ytd" href="#">Año en
-                                            curso</a>
-                                    </div>
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="card-body">
-                            <div id="topClientesChart"></div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-                <!-- Grafico de Top Proveedores -->
-
-                <div class="col-6">
-
-                    <div class="card">
-
-                        <div class="card-body">
-
-                            <h4 class="card-title">Top 5 Proveedores con Mayor Monto de Compras ($)</h4>
-
-                            <div id="topProveedoresChart"></div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
 
         </div>
 
@@ -791,10 +742,5 @@
             border: none !important;
             display: inline-block;
         }
-
-
-
     </style>
 @endpush
-
-

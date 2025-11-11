@@ -58,10 +58,8 @@ document.addEventListener('DOMContentLoaded', function () {
             // Distribucion de productos vendidos/comprados con filtros
             const distributionDefaultRange = '6m';
             const ventasDistributionRanges = data.ventasProductosByRange ?? {};
-            const comprasDistributionRanges = data.comprasProductosByRange ?? {};
 
             const ventasDefaultEntries = extractDistributionEntries(ventasDistributionRanges, distributionDefaultRange, data.ventasProductos ?? []);
-            const comprasDefaultEntries = extractDistributionEntries(comprasDistributionRanges, distributionDefaultRange, data.comprasProductos ?? []);
 
             const ventasDistribucionChart = initEchartsPieChart(
                 'ventasProductosChart',
@@ -70,12 +68,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 ['#405189', '#0AB39C', '#F7B84B', '#F06548', '#6F42C1']
             );
 
-            const comprasDistribucionChart = initEchartsPieChart(
-                'comprasProductosChart',
-                comprasDefaultEntries.labels,
-                comprasDefaultEntries.values,
-                ['#0AB39C', '#299CDB', '#F7B84B', '#F06548', '#6F42C1']
-            );
 
             setupDistributionFilter({
                 prefix: 'ventas',
@@ -85,13 +77,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 defaultRange: distributionDefaultRange,
             });
 
-            setupDistributionFilter({
-                prefix: 'compras',
-                chartRef: comprasDistribucionChart,
-                dataset: comprasDistributionRanges,
-                fallback: data.comprasProductos ?? [],
-                defaultRange: distributionDefaultRange,
-            });
             // Top clientes (barra horizontal con marcador de montos, doble escala)
             const topClientesRanges = data.topClientesByRange ?? {};
             const topClientesFallback = data.topClientes ?? [];
@@ -194,17 +179,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
 
-            // Top proveedores
-            const proveedores = data.topProveedores.map(p => p.proveedor);
-            const comprasProveedores = data.topProveedores.map(p => Number(p.total_compras));
-
-            new ApexCharts(document.querySelector("#topProveedoresChart"), {
-                chart: { type: 'bar', height: 350 },
-                series: [{ name: 'Compras', data: comprasProveedores }],
-                xaxis: { categories: proveedores },
-                yaxis: { title: { text: "Monto ($)" } },
-                colors: ['#FF5733']
-            }).render();
         })
         .catch(error => {
             console.error("Error al cargar dashboard:", error);

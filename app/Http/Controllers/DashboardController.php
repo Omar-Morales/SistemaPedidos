@@ -116,15 +116,11 @@ class DashboardController extends Controller
         ];
 
         $ventasProductosByRange = [];
-        $comprasProductosByRange = [];
-
         foreach ($distributionRanges as $key => $startDate) {
             $ventasProductosByRange[$key] = $this->topVentasProductosDesde($startDate);
-            $comprasProductosByRange[$key] = $this->topComprasProductosDesde($startDate);
         }
 
         $ventasProductos = $ventasProductosByRange['6m'] ?? collect();
-        $comprasProductos = $comprasProductosByRange['6m'] ?? collect();
 
         // Top clientes y proveedores
         $topClientesByRange = [];
@@ -132,16 +128,6 @@ class DashboardController extends Controller
             $topClientesByRange[$key] = $this->topClientesDesde($startDate);
         }
         $topClientes = $topClientesByRange['6m'] ?? collect();
-
-        $topProveedores = Compra::select(
-                'suppliers.name as proveedor',
-                DB::raw('SUM(compras.total_cost) as total_compras')
-            )
-            ->join('suppliers', 'compras.supplier_id', '=', 'suppliers.id')
-            ->groupBy('suppliers.name')
-            ->orderByDesc('total_compras')
-            ->limit(5)
-            ->get();
 
         $metrics = [
             'totalComprasMonto' => $totalComprasMes,
@@ -215,12 +201,9 @@ class DashboardController extends Controller
             'metrics' => $metrics,
             'stats' => $stats,
             'ventasProductos' => $ventasProductos,
-            'comprasProductos' => $comprasProductos,
             'ventasProductosByRange' => $ventasProductosByRange,
-            'comprasProductosByRange' => $comprasProductosByRange,
             'topClientes' => $topClientes,
             'topClientesByRange' => $topClientesByRange,
-            'topProveedores' => $topProveedores,
             'ordersSummary' => $ordersSummary,
         ]);
     }
@@ -234,28 +217,6 @@ class DashboardController extends Controller
             ->join('products', 'detalle_ventas.product_id', '=', 'products.id')
             ->join('ventas', 'detalle_ventas.sale_id', '=', 'ventas.id')
             ->where('ventas.sale_date', '>=', $startDate)
-            ->groupBy('products.name')
-            ->orderByDesc('total')
-            ->limit($limit)
-            ->get()
-            ->map(function ($row) {
-                return [
-                    'producto' => $row->producto,
-                    'total' => (int) $row->total,
-                ];
-            })
-            ->values();
-    }
-
-    protected function topComprasProductosDesde(Carbon $startDate, int $limit = 5)
-    {
-        return DetalleCompra::select(
-                'products.name as producto',
-                DB::raw('SUM(detalle_compras.quantity) as total')
-            )
-            ->join('products', 'detalle_compras.product_id', '=', 'products.id')
-            ->join('compras', 'detalle_compras.purchase_id', '=', 'compras.id')
-            ->where('compras.purchase_date', '>=', $startDate)
             ->groupBy('products.name')
             ->orderByDesc('total')
             ->limit($limit)
