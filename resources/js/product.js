@@ -112,6 +112,17 @@ $(document).on('click', '.buttons-colvis', function () {
 
 });
 
+$(document).on('click', '.view-image-btn', function () {
+  const imageUrl = $(this).data('image-url') || defaultProductImage;
+  const modalImg = document.getElementById('imgProductoModal');
+  if (modalImg) {
+    modalImg.src = imageUrl;
+  }
+  if (modalVerImagenProducto) {
+    modalVerImagenProducto.show();
+  }
+});
+
 
 
 // Opcional: cuando se carga la p├ígina

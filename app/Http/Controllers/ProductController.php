@@ -263,6 +263,10 @@ class ProductController extends Controller
 
     public function getData(Request $request)
     {
+    $currentUser = Auth::user();
+    $warehouseRoleNames = ['Curva', 'Milla', 'Santa Carolina'];
+    $isWarehouseRole = $currentUser?->hasAnyRole($warehouseRoleNames) ?? false;
+
     $products = Product::with('category', 'images')
         ->select('products.*', DB::raw("(SELECT COUNT(*) FROM products p2 WHERE p2.status IN ('available','sold') AND p2.id <= products.id) as row_number"))
         ->whereIn('products.status', ['available', 'sold']);
@@ -279,23 +283,26 @@ class ProductController extends Controller
                 };
             })
         ->addColumn('image', function ($product) {
-            $img = $product->images->first();
-            $photoPath = $img ? $img->image_path : null;
-
-            if ($photoPath && file_exists(storage_path('app/public/' . $photoPath))) {
-                $url = asset('storage/' . $photoPath);
-            } else {
-                $url = asset('assets/images/product.png');
-            }
-
+            $url = $this->resolveProductImageUrl($product);
             return '<img src="' . $url . '" class="custom-thumbnail" width="30" alt="Imagen de ' . e($product->name) . '">';
         })
         ->addColumn('category_name', fn($product) => $product->category->name ?? 'Sin Categoría')
         ->editColumn('product_code', fn($product) => $product->product_code ?? '-')
 
-        ->addColumn('acciones', function ($product) {
+        ->addColumn('acciones', function ($product) use ($currentUser, $isWarehouseRole) {
             if ($product->status === 'archived') {
             return '';
+            }
+
+            if ($isWarehouseRole) {
+            $imageUrl = $this->resolveProductImageUrl($product);
+            return '
+                <button type="button"
+                    class="btn btn-link btn-sm p-0 view-image-btn"
+                    data-image-url="' . e($imageUrl) . '"
+                    title="Ver imagen">
+                    <i class="ri-image-line me-1"></i> Ver Imagen
+                </button>';
             }
 
             $acciones = '';
@@ -354,11 +361,11 @@ public function uploadTemp(Request $request)
 
 
 
-public function uploadImages(Request $request, Product $product)
-{
-    $request->validate([
-        'file' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048'
-    ]);
+    public function uploadImages(Request $request, Product $product)
+    {
+        $request->validate([
+            'file' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048'
+        ]);
 
     $image = $request->file('file'); // Nota: 'file' no 'images'
     $path = $image->store('products', 'public');
@@ -393,8 +400,8 @@ public function deleteImage(Request $request, Product $product)
 
 
 
-public function list(Request $request)
-{
+    public function list(Request $request)
+    {
     /*return response()->json(
         Product::select('id', 'name')->orderBy('name')->get()
     );*/
@@ -421,7 +428,19 @@ public function list(Request $request)
     });
 
     return response()->json($productos);
-}
+    }
+
+    protected function resolveProductImageUrl(Product $product): string
+    {
+        $img = $product->images->first();
+        $photoPath = $img ? $img->image_path : null;
+
+        if ($photoPath && Storage::disk('public')->exists($photoPath)) {
+            return asset('storage/' . $photoPath);
+        }
+
+        return asset('assets/images/product.png');
+    }
 
 }
 
