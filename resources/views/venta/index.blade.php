@@ -183,8 +183,8 @@
                                 </div>
 
                                 <div class="col-12 col-lg-6">
-                                    <label for="status" class="form-label">Estado de Pedido</label>
-                                    <select class="form-select" id="status" name="status">
+                                    <label for="order_status" class="form-label">Estado de Pedido</label>
+                                    <select class="form-select" id="order_status" name="status">
                                         <option value="pending" selected>Pendiente</option>
                                         <option value="in_progress">En curso</option>
                                         <option value="delivered">Entregado</option>
@@ -212,7 +212,7 @@
 
                             </div>
                         @else
-                            <input type="hidden" id="status" name="status" value="pending">
+                            <input type="hidden" id="order_status" name="status" value="pending">
                             <input type="hidden" id="amount_paid" name="amount_paid" value="0.00">
                         @endif
 

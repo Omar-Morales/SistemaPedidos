@@ -39,7 +39,10 @@ for (const role of userRoles) {
     }
 }
 
-const statusField = document.getElementById('status') || document.getElementById('detail_order_status');
+const statusField =
+    document.getElementById('order_status') ||
+    document.getElementById('status') ||
+    document.getElementById('detail_order_status');
 const getStatusValue = () => (statusField ? statusField.value || 'pending' : 'pending');
 const setStatusValue = (value) => {
     if (statusField) {
