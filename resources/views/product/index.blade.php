@@ -37,6 +37,7 @@
                     <th>#</th>
                     <th>Imagen</th>
                     <th>Nombre</th>
+                    <th>Cod. Producto</th>
                     <th>Categoría</th>
                     <th>Precio</th>
                     <th>Cantidad</th>
@@ -75,6 +76,11 @@
           <div class="mb-3">
             <label for="name" class="form-label">Nombre</label>
             <input type="text" class="form-control" id="name" name="name" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="product_code" class="form-label">Cod. Producto</label>
+            <input type="text" class="form-control" id="product_code" name="product_code" maxlength="50" pattern="[A-Za-z0-9]+" inputmode="text" autocomplete="off">
           </div>
 
           <div class="mb-3">

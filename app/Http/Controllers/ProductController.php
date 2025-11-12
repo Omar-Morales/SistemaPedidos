@@ -37,12 +37,22 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
+        if ($request->has('product_code') && $request->input('product_code') === '') {
+            $request->merge(['product_code' => null]);
+        }
+
         $request->validate([
             'name' => [
                 'required',
                 'string',
                 'max:255',
                 Rule::unique('products')->where(fn($query) => $query->whereIn('status', ['available', 'sold'])),
+            ],
+            'product_code' => [
+                'nullable',
+                'alpha_num',
+                'max:50',
+                Rule::unique('products', 'product_code')->where(fn($query) => $query->whereIn('status', ['available', 'sold'])),
             ],
             'price' => 'required|numeric|min:0',
             'quantity' => 'required|integer|min:1',
@@ -62,7 +72,7 @@ class ProductController extends Controller
         $reactivated = false;
 
         if ($existing && $existing->status === 'archived') {
-            $existing->fill($request->only(['name', 'price', 'quantity', 'category_id']));
+            $existing->fill($request->only(['name', 'product_code', 'price', 'quantity', 'category_id']));
             $existing->status = 'available';
             $existing->user_id = auth()->id();
             $existing->save();
@@ -73,7 +83,7 @@ class ProductController extends Controller
             $nextId = $latest ? $latest->id + 1 : 1;
             $sku = 'PROD-' . str_pad($nextId, 5, '0', STR_PAD_LEFT);
 
-            $data = $request->only(['name', 'price', 'quantity', 'category_id']);
+            $data = $request->only(['name', 'product_code', 'price', 'quantity', 'category_id']);
             $data['user_id'] = auth()->id();
             $data['sku'] = $sku;
             $data['status'] = 'available';
@@ -178,12 +188,22 @@ class ProductController extends Controller
 
     public function update(Request $request, string $id)
     {
+        if ($request->has('product_code') && $request->input('product_code') === '') {
+            $request->merge(['product_code' => null]);
+        }
+
         $request->validate([
             'name' => [
                 'required',
                 'string',
                 'max:255',
                 Rule::unique('products')->ignore($id)->where(fn($query) => $query->whereIn('status', ['available', 'sold'])),
+            ],
+            'product_code' => [
+                'nullable',
+                'alpha_num',
+                'max:50',
+                Rule::unique('products', 'product_code')->ignore($id)->where(fn($query) => $query->whereIn('status', ['available', 'sold'])),
             ],
             'price' => 'required|numeric|min:0',
             'quantity' => 'required|integer|min:1',
@@ -195,7 +215,7 @@ class ProductController extends Controller
 
     $product = Product::findOrFail($id);
 
-    $product->fill($request->only(['name', 'price', 'quantity', 'category_id']));
+    $product->fill($request->only(['name', 'product_code', 'price', 'quantity', 'category_id']));
     $product->save();
 
     $this->syncProductStatus($product);
@@ -271,6 +291,7 @@ class ProductController extends Controller
             return '<img src="' . $url . '" class="custom-thumbnail" width="30" alt="Imagen de ' . e($product->name) . '">';
         })
         ->addColumn('category_name', fn($product) => $product->category->name ?? 'Sin Categoría')
+        ->editColumn('product_code', fn($product) => $product->product_code ?? '-')
 
         ->addColumn('acciones', function ($product) {
             if ($product->status === 'archived') {

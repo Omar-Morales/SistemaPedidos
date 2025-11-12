@@ -25,7 +25,7 @@ let table = $('#productsTable').DataTable({
     { data:'image', orderable:false, searchable:false },
 
     { data:'name' },
-
+    { data:'product_code', name:'products.product_code', defaultContent: '-' },
     { data:'category_name', name:'category.name' },
 
     { data:'price' },
@@ -532,6 +532,7 @@ $(document).on('click', '.edit-btn', async function() {
     $('#producto_id').val(product.id);
 
     $('#name').val(product.name);
+    $('#product_code').val(product.product_code ?? '');
 
     $('#price').val(product.price);
 
