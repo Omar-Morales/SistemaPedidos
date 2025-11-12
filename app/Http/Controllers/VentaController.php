@@ -1432,6 +1432,12 @@ class VentaController extends Controller
                     default => 'Curva',
                 };
             })
+            ->addColumn('tipo_entrega', function ($detalle) {
+                return match ($detalle->detalle_delivery_type) {
+                    'delivery' => 'Enviar',
+                    default => 'Recoge',
+                };
+            })
             ->addColumn('total', function ($detalle) {
                 if ($detalle->detalle_status === 'cancelled') {
                     return 'S/ 0.00';

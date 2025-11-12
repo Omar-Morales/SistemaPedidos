@@ -579,7 +579,9 @@ const ventasTableColumns = [
     { data: 'producto', name: 'products.name' },
     { data: 'cantidad', name: 'detalle_ventas.quantity' },
     { data: 'unidad', name: 'detalle_ventas.unit' },
-    { data: 'almacen', name: 'ventas.warehouse' },
+    isWarehouseRole
+        ? { data: 'tipo_entrega', name: 'detalle_ventas.delivery_type' }
+        : { data: 'almacen', name: 'ventas.warehouse' },
     { data: 'total', name: 'detalle_ventas.subtotal' },
 ];
 

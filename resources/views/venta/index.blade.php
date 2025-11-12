@@ -52,7 +52,11 @@
                                             <th>Producto</th>
                                             <th>Cantidad</th>
                                             <th>Unidad</th>
-                                            <th>Almacen</th>
+                                            @if ($isWarehouseRole)
+                                                <th>Tipo de Entrega</th>
+                                            @else
+                                                <th>Almacen</th>
+                                            @endif
                                             <th>Total</th>
                                             <th>Monto Pagado</th>
                                             <th>Diferencia</th>
