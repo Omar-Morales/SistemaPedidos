@@ -3,6 +3,12 @@
 @section('title', 'Mantenimiento de Tiendas')
 
 @section('content')
+@php
+    $user = auth()->user();
+    $roleNames = $user ? $user->getRoleNames() : collect();
+    $warehouseRoleNames = collect(['Curva', 'Milla', 'Santa Carolina']);
+    $isWarehouseRole = $roleNames->intersect($warehouseRoleNames)->isNotEmpty();
+@endphp
 <div class="page-content">
     <div class="container-fluid">
 
@@ -39,9 +45,13 @@
                                         <th>RUC</th>
                                         <th>Nombre</th>
                                         <th>Ubicacion</th>
-                                        <th>Telefono</th>
+                                        @unless($isWarehouseRole)
+                                            <th>Telefono</th>
+                                        @endunless
                                         <!--<th>Estado</th>-->
-                                        <th>Acciones</th>
+                                        @unless($isWarehouseRole)
+                                            <th>Acciones</th>
+                                        @endunless
                                     </tr>
                                 </thead>
                                 <tbody>

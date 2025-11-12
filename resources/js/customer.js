@@ -3,6 +3,10 @@ import axios from 'axios';
 axios.defaults.headers.common['X-CSRF-TOKEN'] =
     document.querySelector('meta[name="csrf-token"]').content;
 
+const userRoles = (document.body.dataset.userRoles || '').toLowerCase();
+const warehouseRoles = ['curva', 'milla', 'santa carolina'];
+const IS_WAREHOUSE_ROLE = warehouseRoles.some(role => userRoles.includes(role));
+
 const LOCATION_OPTIONS = [
     'Cdra 7',
     'Cdra 8',
@@ -42,6 +46,20 @@ btnCrear?.addEventListener('click', () => {
     modal.show();
 });
 
+const customerColumns = [
+    { data: 'row_number', name: 'row_number', searchable: false },
+    { data: 'ruc', name: 'ruc' },
+    { data: 'name', name: 'name' },
+    { data: 'location', name: 'location', orderable: false, searchable: false },
+];
+
+if (!IS_WAREHOUSE_ROLE) {
+    customerColumns.push(
+        { data: 'phone', name: 'phone' },
+        { data: 'acciones', name: 'acciones', orderable: false, searchable: false },
+    );
+}
+
 const table = $('#customersTable').DataTable({
     processing: true,
     serverSide: true,
@@ -49,14 +67,7 @@ const table = $('#customersTable').DataTable({
         url: '/customers/data',
         type: 'GET'
     },
-    columns: [
-        { data: 'row_number', name: 'row_number', searchable: false },
-        { data: 'ruc', name: 'ruc' },
-        { data: 'name', name: 'name' },
-        { data: 'location', name: 'location', orderable: false, searchable: false },
-        { data: 'phone', name: 'phone' },
-        { data: 'acciones', name: 'acciones', orderable: false, searchable: false }
-    ],
+    columns: customerColumns,
     language: { url: '/assets/js/es-ES.json' },
     responsive: true,
     autoWidth: false,
