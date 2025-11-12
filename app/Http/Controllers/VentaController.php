@@ -1317,6 +1317,7 @@ class VentaController extends Controller
             ->leftJoin('products', 'products.id', '=', 'detalle_ventas.product_id');
 
         $currentUser = Auth::user();
+        $isSupervisor = $currentUser?->hasRole('Supervisor') ?? false;
         $restrictedWarehouse = $this->resolveWarehouseScopeForUser($currentUser);
 
         if ($restrictedWarehouse) {
@@ -1395,7 +1396,7 @@ class VentaController extends Controller
                     default => '<span class="badge bg-warning text-dark p-2">Pendiente</span>',
                 };
             })
-            ->addColumn('acciones', function ($detalle) use ($currentUser) {
+            ->addColumn('acciones', function ($detalle) use ($currentUser, $isSupervisor) {
                 $ventaCancelada = ($detalle->venta_status === 'cancelled');
                 $detalleCancelado = ($detalle->detalle_status === 'cancelled');
 
@@ -1405,7 +1406,10 @@ class VentaController extends Controller
 
                 $acciones = '';
 
-                if ($currentUser && $currentUser->can('administrar.ventas.edit')) {
+                $detalleEntregado = ($detalle->detalle_status === 'delivered');
+                $shouldHideEditForSupervisor = $isSupervisor && $detalleEntregado;
+
+                if ($currentUser && $currentUser->can('administrar.ventas.edit') && ! $shouldHideEditForSupervisor) {
                     $acciones .= '
                         <button type="button" class="btn btn-sm btn-outline-warning btn-icon waves-effect waves-light edit-btn"
                             data-id="' . $detalle->sale_id . '" data-detail-id="' . $detalle->detalle_id . '" title="Editar">

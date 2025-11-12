@@ -54,9 +54,7 @@
                                             <th>Unidad</th>
                                             <th>Almacen</th>
                                             <th>Total</th>
-                                            @unless ($isSupervisorRole)
-                                                <th>Monto Pagado</th>
-                                            @endunless
+                                            <th>Monto Pagado</th>
                                             <th>Diferencia</th>
                                             <th>Metodo de Pago</th>
                                             <th>Estado de Pago</th>

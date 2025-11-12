@@ -501,9 +501,7 @@ const ventasTableColumns = [
     { data: 'total', name: 'detalle_ventas.subtotal' },
 ];
 
-if (!isSupervisorRole) {
-    ventasTableColumns.push({ data: 'monto_pagado', name: 'detalle_ventas.amount_paid' });
-}
+ventasTableColumns.push({ data: 'monto_pagado', name: 'detalle_ventas.amount_paid' });
 
 ventasTableColumns.push(
     { data: 'diferencia', name: 'detalle_ventas.difference' },
