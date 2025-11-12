@@ -39,6 +39,14 @@ for (const role of userRoles) {
     }
 }
 
+const statusField = document.getElementById('status') || document.getElementById('detail_order_status');
+const getStatusValue = () => (statusField ? statusField.value || 'pending' : 'pending');
+const setStatusValue = (value) => {
+    if (statusField) {
+        statusField.value = value;
+    }
+};
+
 const rolesWithExtendedPaymentPrivileges = new Set(['administrador', 'curva', 'milla', 'santa carolina']);
 const isSupervisorRole = userRoles.includes('supervisor');
 const isWarehouseRole = Boolean(restrictedWarehouse);
@@ -55,6 +63,14 @@ let detalleEditableDT = null;
 let isEditingVenta = false;
 let editingDetailId = null;
 let hiddenDetails = [];
+let forcedWarehousePaymentStatus = null;
+
+if (statusField && isWarehouseRole) {
+    statusField.addEventListener('change', () => {
+        const newStatus = getStatusValue();
+        handleWarehouseStatusChange(newStatus);
+    });
+}
 
 if (isWarehouseRole && btnAgregarProducto) {
     btnAgregarProducto.classList.add('d-none');
@@ -104,7 +120,6 @@ function cargarProductos(callback, includeIds = []) {
         });
 }
 
-const $status = $('#status');
 const $customer_id = $('#customer_id');
 const $tipodocumento_id = $('#tipodocumento_id');
 const $payment_method = $('#payment_method');
@@ -184,7 +199,7 @@ if (restrictedWarehouse) {
 function resetearModalVenta(forNewSale = true) {
     formVenta.reset();
     $('#venta_id').val('');
-    $('#status').val('pending');
+    setStatusValue('pending');
     if (forNewSale) {
         isEditingVenta = false;
     }
@@ -286,6 +301,73 @@ function getHiddenFields(row) {
         paymentMethod: row?.querySelector('.hidden-payment-method') || null,
         detailId: row?.querySelector('.hidden-detail-id') || null,
     };
+}
+
+function propagateStatusToDetails(newStatus) {
+    const normalizedStatus = newStatus || 'pending';
+
+    if (detalleEditableDT) {
+        detalleEditableDT.rows().every(function () {
+            const hidden = getHiddenFields(this.node());
+            if (hidden.orderStatus) {
+                hidden.orderStatus.value = normalizedStatus;
+            }
+        });
+    }
+
+    hiddenDetails = hiddenDetails.map(detail => ({
+        ...detail,
+        status: normalizedStatus,
+    }));
+}
+
+function handleWarehouseStatusChange(newStatus) {
+    propagateStatusToDetails(newStatus);
+
+    const isCancelled = newStatus === 'cancelled';
+    forcedWarehousePaymentStatus = isCancelled ? 'cancelled' : null;
+
+    if (isCancelled && amountPaidInput) {
+        amountPaidInput.value = '0.00';
+    }
+
+    if (detalleEditableDT) {
+        detalleEditableDT.rows().every(function () {
+            const row = this.node();
+            const hidden = getHiddenFields(row);
+            if (!hidden) return;
+
+            if (hidden.paymentStatus) {
+                if (isCancelled) {
+                    hidden.paymentStatus.value = 'cancelled';
+                }
+            }
+
+            if (isCancelled && hidden.amount) {
+                hidden.amount.value = '0.00';
+            }
+            if (isCancelled && hidden.difference) {
+                const subtotalInput = row?.querySelector('.subtotal-input');
+                const subtotal = subtotalInput ? parseFloat(subtotalInput.value) || 0 : 0;
+                hidden.difference.value = subtotal.toFixed(2);
+            }
+        });
+    }
+
+    hiddenDetails = hiddenDetails.map(detail => {
+        const updated = { ...detail, status: newStatus };
+        if (isCancelled) {
+            updated.amount_paid = 0;
+            updated.difference = parseFloat(detail.subtotal) || 0;
+            updated.payment_status = isCancelled ? 'cancelled' : detail.payment_status;
+        }
+        return updated;
+    });
+
+    if (isCancelled) {
+        calcularTotal();
+        applyGlobalSelection('payment_status', 'cancelled');
+    }
 }
 
 function syncGlobalSelectorsWithRow(row) {
@@ -657,8 +739,7 @@ function calcularTotal() {
     let total = 0;
     let amountPaid = 0;
     const statuses = [];
-    const statusHiddenInput = document.getElementById('status');
-    const globalOrderStatus = statusHiddenInput ? statusHiddenInput.value || 'pending' : 'pending';
+    const globalOrderStatus = getStatusValue();
     const globalPaymentStatus = paymentStatusSelect ? paymentStatusSelect.value || 'pending' : 'pending';
 
     // Recorre todas las filas (incluso las ocultas en otras paginas)
@@ -729,7 +810,7 @@ function calcularTotal() {
     if (amountPaidInput) amountPaidInput.value = amountPaid.toFixed(2);
 
     const ventaStatus = resolveVentaStatusFromDetails(statuses);
-    $('#status').val(ventaStatus);
+    setStatusValue(ventaStatus);
 
     const paymentStatus = computePaymentStatus(total, amountPaid);
     if (paymentStatusSelect) {
@@ -760,6 +841,7 @@ const detailFieldSyncMap = {
     warehouse: { hiddenKey: 'warehouse', detailKey: 'warehouse', defaultValue: 'curva' },
     delivery_type: { hiddenKey: 'deliveryType', detailKey: 'delivery_type', defaultValue: 'pickup' },
     payment_method: { hiddenKey: 'paymentMethod', detailKey: 'payment_method', defaultValue: 'efectivo' },
+    payment_status: { hiddenKey: 'paymentStatus', detailKey: 'payment_status', defaultValue: 'pending' },
 };
 
 function applyGlobalSelection(field, rawValue) {
@@ -768,6 +850,8 @@ function applyGlobalSelection(field, rawValue) {
     let value = (rawValue ?? mapping.defaultValue).toString();
     if (field === 'payment_method') {
         value = normalizePaymentMethodValue(value);
+    } else if (field === 'payment_status') {
+        value = value.toLowerCase();
     }
 
     if (detalleEditableDT) {
@@ -928,14 +1012,16 @@ function agregarFilaProducto(data = {}) {
     const subtotalNumber = subtotalValue === '' ? 0 : subtotalValue;
     const subtotal = subtotalValue === '' ? '' : subtotalNumber.toFixed(2);
 
-    const defaultPaymentStatus = paymentStatusSelect?.value === 'paid' ? 'paid' : 'pending';
+    const defaultPaymentStatus = forcedWarehousePaymentStatus
+        ? forcedWarehousePaymentStatus
+        : (paymentStatusSelect?.value === 'paid' ? 'paid' : 'pending');
     const paymentStatus = data.payment_status ?? defaultPaymentStatus;
     const defaultAmount = paymentStatus === 'paid' ? subtotalNumber : 0;
     const amountValue = data.amount_paid !== undefined && data.amount_paid !== null
         ? parseFloat(data.amount_paid)
         : defaultAmount;
 
-    const defaultOrderStatus = $('#status').val() || 'pending';
+    const defaultOrderStatus = getStatusValue();
     const orderStatus = data.status ?? defaultOrderStatus;
 
     const warehouseValue = String(data.warehouse ?? ($('#warehouse').val() || 'curva'));
@@ -1137,7 +1223,8 @@ formVenta.addEventListener('submit', function (e) {
         const formData = new FormData(formVenta);
         const ventaId = formData.get('venta_id');
         const selectedPaymentStatus = paymentStatusSelect?.value || 'pending';
-        formData.set('payment_status', selectedPaymentStatus);
+        const effectivePaymentStatus = forcedWarehousePaymentStatus ?? selectedPaymentStatus;
+        formData.set('payment_status', effectivePaymentStatus);
         if (isDetailEdit) {
             if (detalle.length !== 1) {
                 Swal.fire('Error', 'No se pudo identificar el detalle a editar.', 'error');
@@ -1152,7 +1239,7 @@ formVenta.addEventListener('submit', function (e) {
                 payment_method: formData.get('payment_method'),
                 delivery_type: formData.get('delivery_type'),
                 warehouse: formData.get('warehouse'),
-                payment_status: selectedPaymentStatus,
+                payment_status: effectivePaymentStatus,
                 detail: detailPayload,
             };
 
@@ -1258,7 +1345,7 @@ $(document).on('click', '.edit-btn', async function () {
         $('#sale_date').val(venta.fecha);
         $('#delivery_type').val(venta.delivery_type).trigger('change');
         $('#warehouse').val(venta.warehouse).trigger('change');
-        $('#status').val(venta.estado ?? 'pending');
+        setStatusValue(venta.estado ?? 'pending');
 
         const $paymentMethodSelect = $('#payment_method');
         const currentPaymentMethod = normalizePaymentMethodValue(venta.payment_method || '');

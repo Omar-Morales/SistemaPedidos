@@ -11,6 +11,7 @@ use App\Models\Venta;
 use App\Models\VentaLog;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -176,15 +177,68 @@ class VentaController extends Controller
         return null;
     }
 
+    private function normalizeWarehouseValue(?string $value): string
+    {
+        $value = trim((string) ($value ?? ''));
+        if ($value === '') {
+            return '';
+        }
+
+        $normalized = strtolower($value);
+        $normalized = str_replace([' ', '-'], '_', $normalized);
+        $normalized = preg_replace('/_+/', '_', $normalized ?? '');
+
+        return $normalized ?? '';
+    }
+
+    private function resolveWarehouseValueForUpdate(?string $requestedWarehouse, Venta $venta, ?string $restrictedWarehouse = null): string
+    {
+        $candidate = $this->normalizeWarehouseValue($requestedWarehouse);
+        if ($candidate !== '') {
+            return $candidate;
+        }
+
+        $existing = $this->normalizeWarehouseValue($venta->warehouse);
+        if ($existing !== '') {
+            return $existing;
+        }
+
+        if ($restrictedWarehouse) {
+            return $restrictedWarehouse;
+        }
+
+        if (!$venta->relationLoaded('detalles')) {
+            $venta->loadMissing('detalles');
+        }
+
+        $detalleWarehouse = $this->normalizeWarehouseValue(optional($venta->detalles->first())->warehouse);
+        if ($detalleWarehouse !== '') {
+            return $detalleWarehouse;
+        }
+
+        return 'curva';
+    }
+
     private function filterDetallesByWarehouse(Venta $venta, ?string $restrictedWarehouse): Collection
     {
         if (!$restrictedWarehouse) {
             return $venta->detalles;
         }
 
+        $ventaWarehouse = $this->normalizeWarehouseValue($venta->warehouse ?? '');
+        if ($ventaWarehouse !== '' && $ventaWarehouse === $restrictedWarehouse) {
+            return $venta->detalles;
+        }
+
         return $venta->detalles
             ->filter(function (DetalleVenta $detalle) use ($venta, $restrictedWarehouse) {
-                $detalleWarehouse = strtolower(trim((string) ($detalle->warehouse ?? $venta->warehouse)));
+                $detalleWarehouse = $this->normalizeWarehouseValue($detalle->warehouse ?? $venta->warehouse ?? '');
+
+                if ($detalleWarehouse === '') {
+                    // Si el detalle no tiene almacen asignado dejamos que los roles restringidos lo vean
+                    return true;
+                }
+
                 return $detalleWarehouse === $restrictedWarehouse;
             })
             ->values();
@@ -197,7 +251,11 @@ class VentaController extends Controller
             return;
         }
 
-        $detalleWarehouse = strtolower(trim((string) ($detalle->warehouse ?? optional($detalle->venta)->warehouse)));
+        $detalleWarehouse = $this->normalizeWarehouseValue($detalle->warehouse ?? optional($detalle->venta)->warehouse ?? '');
+        if ($detalleWarehouse === '') {
+            return;
+        }
+
         if ($detalleWarehouse !== $restrictedWarehouse) {
             abort(403, 'No tienes permiso para administrar este producto.');
         }
@@ -351,7 +409,7 @@ class VentaController extends Controller
                 return response()->json(['message' => "El producto '{$producto->name}' esta repetido."], 422);
             }
 
-            $warehouseDetalle = $item['warehouse'] ?? $request->warehouse;
+            $warehouseDetalle = $this->normalizeWarehouseValue($item['warehouse'] ?? $request->warehouse);
             $deliveryDetalle = $item['delivery_type'] ?? $request->delivery_type;
             $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
@@ -383,7 +441,7 @@ class VentaController extends Controller
             $subtotal = isset($item['subtotal']) ? (float) $item['subtotal'] : 0;
             $unitInput = $item['unit'] ?? null;
             $amountPaid = isset($item['amount_paid']) ? max(0, (float) $item['amount_paid']) : 0;
-            $warehouseDetalle = $item['warehouse'] ?? $venta->warehouse;
+            $warehouseDetalle = $this->normalizeWarehouseValue($item['warehouse'] ?? $venta->warehouse);
             $deliveryDetalle = $item['delivery_type'] ?? $venta->delivery_type;
             $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
@@ -422,7 +480,7 @@ class VentaController extends Controller
                 ], 422);
             }
 
-            $warehouseDetalle = $item['warehouse'] ?? $request->warehouse;
+            $warehouseDetalle = $this->normalizeWarehouseValue($item['warehouse'] ?? $request->warehouse);
             $deliveryDetalle = $item['delivery_type'] ?? $request->delivery_type;
             $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
@@ -452,7 +510,7 @@ class VentaController extends Controller
                 $paymentMethodDetalle = null;
             }
 
-            $warehouseDetalle = $item['warehouse'] ?? $request->warehouse;
+            $warehouseDetalle = $this->normalizeWarehouseValue($item['warehouse'] ?? $request->warehouse);
             $deliveryDetalle = $item['delivery_type'] ?? $request->delivery_type;
             $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
@@ -602,12 +660,19 @@ class VentaController extends Controller
         $venta = Venta::with(['detalles'])->findOrFail($id);
 
         $restrictedWarehouse = $this->resolveWarehouseScopeForUser(Auth::user());
+        $ventaWarehouse = $this->normalizeWarehouseValue($venta->warehouse);
         if ($restrictedWarehouse) {
             $filteredDetalles = $this->filterDetallesByWarehouse($venta, $restrictedWarehouse);
-            if ($filteredDetalles->isEmpty()) {
-                abort(403, 'No tienes permiso para ver esta venta.');
+
+            if ($venta->detalles->isNotEmpty() && $filteredDetalles->isEmpty()) {
+                if ($ventaWarehouse !== '' && $ventaWarehouse !== $restrictedWarehouse) {
+                    abort(403, 'No tienes permiso para ver esta venta.');
+                }
+
+                $venta->setRelation('detalles', collect());
+            } else {
+                $venta->setRelation('detalles', $filteredDetalles);
             }
-            $venta->setRelation('detalles', $filteredDetalles);
         }
 
         $clientesQuery = Customer::query()
@@ -630,6 +695,8 @@ class VentaController extends Controller
                 ];
             });
 
+        $ventaWarehouse = $this->normalizeWarehouseValue($venta->warehouse);
+
         return response()->json([
             'venta' => [
                 'id' => $venta->id,
@@ -639,13 +706,13 @@ class VentaController extends Controller
                 'delivery_type' => $venta->delivery_type,
                 'estado' => $venta->status,
                 'payment_method' => $this->normalizePaymentMethod($venta->payment_method) ?? 'efectivo',
-                'warehouse' => $venta->warehouse,
+                'warehouse' => $ventaWarehouse,
                 'total' => (float) $venta->total_price,
                 'amount_paid' => (float) $venta->amount_paid,
                 'payment_status' => $venta->payment_status,
                 'difference' => (float) $venta->difference,
                 'codigo' => $venta->codigo,
-                'detalle' => $venta->detalles->map(function (DetalleVenta $detalle) {
+                'detalle' => $venta->detalles->map(function (DetalleVenta $detalle) use ($venta) {
                     return [
                         'id' => $detalle->id,
                         'product_id' => $detalle->product_id,
@@ -659,7 +726,7 @@ class VentaController extends Controller
                             : 'pending',
                         'amount_paid' => $detalle->amount_paid,
                         'difference' => $detalle->difference,
-                        'warehouse' => $detalle->warehouse,
+                        'warehouse' => $this->normalizeWarehouseValue($detalle->warehouse ?? $venta->warehouse),
                         'delivery_type' => $detalle->delivery_type,
                         'payment_method' => $this->normalizePaymentMethod($detalle->payment_method) ?? 'efectivo',
                     ];
@@ -798,6 +865,8 @@ class VentaController extends Controller
         $differenceVenta = round($total - $totalPagado, 2);
         $saleDate = $request->input('sale_date') ?: Carbon::today()->format('Y-m-d');
 
+        $resolvedWarehouseForVenta = $this->resolveWarehouseValueForUpdate($request->input('warehouse'), $venta);
+
         DB::transaction(function () use (
             $venta,
             $request,
@@ -811,7 +880,8 @@ class VentaController extends Controller
             $originalData,
             $originalDetails,
             $saleDate,
-            $paymentMethodVenta
+            $paymentMethodVenta,
+            $resolvedWarehouseForVenta
         ) {
             foreach ($venta->detalles as $detalleAnterior) {
                 if ($this->shouldAffectInventory($detalleAnterior->status)) {
@@ -868,7 +938,7 @@ class VentaController extends Controller
                 'status' => $statusVenta,
                 'payment_method' => $paymentMethodVenta,
                 'delivery_type' => $request->input('delivery_type', $venta->delivery_type),
-                'warehouse' => $request->input('warehouse', $venta->warehouse),
+                'warehouse' => $resolvedWarehouseForVenta,
                 'total_price' => $total,
                 'amount_paid' => $totalPagado,
                 'payment_status' => $paymentStatusVenta,
@@ -948,7 +1018,7 @@ class VentaController extends Controller
         }
         $difference = round($subtotal - $amountPaid, 2);
         $unitPrice = $quantity > 0 ? round($subtotal / $quantity, 4) : 0;
-        $warehouseDetalle = strtolower(trim((string) ($detailInput['warehouse'] ?? $detalle->warehouse ?? $venta->warehouse)));
+        $warehouseDetalle = $this->normalizeWarehouseValue($detailInput['warehouse'] ?? $detalle->warehouse ?? $venta->warehouse);
         $deliveryDetalle = $detailInput['delivery_type'] ?? $detalle->delivery_type ?? $venta->delivery_type;
         $paymentMethodDetalle = $detailInput['payment_method']
             ?? $this->normalizePaymentMethod($detalle->payment_method)
@@ -995,6 +1065,8 @@ class VentaController extends Controller
             'payment_method' => $this->normalizePaymentMethod($detalle->payment_method) ?? $paymentMethodVenta,
         ];
 
+        $resolvedWarehouseForVenta = $this->resolveWarehouseValueForUpdate($request->input('warehouse'), $venta);
+
         try {
             DB::transaction(function () use (
                 $detalle,
@@ -1014,7 +1086,9 @@ class VentaController extends Controller
                 $deliveryDetalle,
                 $paymentMethodDetalle,
                 $oldDetailData,
-                $paymentMethodVenta
+                $paymentMethodVenta,
+                $resolvedWarehouseForVenta,
+                $restrictedWarehouse
             ) {
                 $oldStatus = $detalle->status;
                 $oldProductId = $detalle->product_id;
@@ -1093,7 +1167,7 @@ class VentaController extends Controller
                     'sale_date' => $saleDate,
                     'payment_method' => $paymentMethodVenta,
                     'delivery_type' => $request->input('delivery_type', $venta->delivery_type),
-                    'warehouse' => $request->input('warehouse', $venta->warehouse),
+                    'warehouse' => $resolvedWarehouseForVenta,
                     'total_price' => $total,
                     'amount_paid' => $amountTotal,
                     'difference' => round($total - $amountTotal, 2),
@@ -1126,6 +1200,7 @@ class VentaController extends Controller
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $th) {
+            report($th);
             return response()->json([
                 'message' => 'Ocurrio un problema al actualizar el detalle.',
                 'error' => $th->getMessage(),
@@ -1219,7 +1294,12 @@ class VentaController extends Controller
             $totalDetalles = $venta->detalles->count();
             $permitidos = $venta->detalles
                 ->filter(function (DetalleVenta $detalle) use ($venta, $restrictedWarehouse) {
-                    $detalleWarehouse = strtolower(trim((string) ($detalle->warehouse ?? $venta->warehouse)));
+                    $detalleWarehouse = $this->normalizeWarehouseValue($detalle->warehouse ?? $venta->warehouse ?? '');
+
+                    if ($detalleWarehouse === '') {
+                        return true;
+                    }
+
                     return $detalleWarehouse === $restrictedWarehouse;
                 })
                 ->count();
@@ -1441,13 +1521,20 @@ class VentaController extends Controller
     {
         $venta = Venta::with('detalles.producto')->findOrFail($id);
         $restrictedWarehouse = $this->resolveWarehouseScopeForUser(Auth::user());
+        $ventaWarehouse = $this->normalizeWarehouseValue($venta->warehouse);
 
         if ($restrictedWarehouse) {
             $filteredDetalles = $this->filterDetallesByWarehouse($venta, $restrictedWarehouse);
-            if ($filteredDetalles->isEmpty()) {
-                abort(403, 'No tienes permiso para ver esta venta.');
+
+            if ($venta->detalles->isNotEmpty() && $filteredDetalles->isEmpty()) {
+                if ($ventaWarehouse !== '' && $ventaWarehouse !== $restrictedWarehouse) {
+                    abort(403, 'No tienes permiso para ver esta venta.');
+                }
+
+                $venta->setRelation('detalles', collect());
+            } else {
+                $venta->setRelation('detalles', $filteredDetalles);
             }
-            $venta->setRelation('detalles', $filteredDetalles);
         }
 
         $detalle = $venta->detalles->map(function ($item) {

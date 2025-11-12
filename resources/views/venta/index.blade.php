@@ -2,15 +2,15 @@
 
 @section('title', 'Mantenimiento de Ventas')
 @section('content')
-@php
-    $user = auth()->user();
-    $roleNames = $user ? $user->getRoleNames() : collect();
-    $warehouseRoleNames = collect(['Curva', 'Milla', 'Santa Carolina']);
-    $isSupervisorRole = $roleNames->contains('Supervisor');
-    $isWarehouseRole = $roleNames->intersect($warehouseRoleNames)->isNotEmpty();
-    $rolesWithPaymentPrivileges = collect(['Administrador'])->merge($warehouseRoleNames);
-    $canManagePaymentStatuses = $roleNames->intersect($rolesWithPaymentPrivileges)->isNotEmpty();
-@endphp
+    @php
+        $user = auth()->user();
+        $roleNames = $user ? $user->getRoleNames() : collect();
+        $warehouseRoleNames = collect(['Curva', 'Milla', 'Santa Carolina']);
+        $isSupervisorRole = $roleNames->contains('Supervisor');
+        $isWarehouseRole = $roleNames->intersect($warehouseRoleNames)->isNotEmpty();
+        $rolesWithPaymentPrivileges = collect(['Administrador'])->merge($warehouseRoleNames);
+        $canManagePaymentStatuses = $roleNames->intersect($rolesWithPaymentPrivileges)->isNotEmpty();
+    @endphp
     <div class="page-content">
         <div class="container-fluid">
 
@@ -109,17 +109,19 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4">
-                                <label for="payment_method" class="form-label">Metodo de Pago</label>
-                                <select class="form-select" id="payment_method" name="payment_method" required>
-                                    <option value="">-- Seleccione --</option>
-                                    <option value="efectivo">Efectivo</option>
-                                    <option value="trans_bcp">Trans. BCP</option>
-                                    <option value="trans_bbva">Trans. BBVA</option>
-                                    <option value="yape">Yape</option>
-                                    <option value="plin">Plin</option>
-                                </select>
-                            </div>
+                            @if (!$isWarehouseRole)
+                                <div class="col-md-4">
+                                    <label for="payment_method" class="form-label">Metodo de Pago</label>
+                                    <select class="form-select" id="payment_method" name="payment_method" required>
+                                        <option value="">-- Seleccione --</option>
+                                        <option value="efectivo">Efectivo</option>
+                                        <option value="trans_bcp">Trans. BCP</option>
+                                        <option value="trans_bbva">Trans. BBVA</option>
+                                        <option value="yape">Yape</option>
+                                        <option value="plin">Plin</option>
+                                    </select>
+                                </div>
+                            @endif
 
                             <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
                                 <label for="delivery_type" class="form-label">Tipo de Entrega</label>
@@ -140,17 +142,19 @@
                                 </select>
                             </div>
 
-                        <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
-                            <label class="form-label" for="payment_status">Estado de Pago</label>
-                            <select class="form-select" id="payment_status" name="payment_status" required>
-                                <option value="pending" selected>Pendiente</option>
-                                @if ($canManagePaymentStatuses)
-                                    <option value="to_collect">Saldo pendiente</option>
-                                    <option value="change">Vuelto pendiente</option>
-                                @endif
-                                <option value="paid">Pagado</option>
-                            </select>
-                        </div>
+                            @if (!$isWarehouseRole)
+                                <div class="col-md-4">
+                                    <label class="form-label" for="payment_status">Estado de Pago</label>
+                                    <select class="form-select" id="payment_status" name="payment_status" required>
+                                        <option value="pending" selected>Pendiente</option>
+                                        @if ($canManagePaymentStatuses)
+                                            <option value="to_collect">Saldo pendiente</option>
+                                            <option value="change">Vuelto pendiente</option>
+                                        @endif
+                                        <option value="paid">Pagado</option>
+                                    </select>
+                                </div>
+                            @endif
 
                             <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
                                 <label for="total_price" class="form-label">Total</label>
@@ -160,11 +164,55 @@
 
                         </div>
 
-                        <input type="hidden" id="status" name="status" value="pending">
+                        @if ($isWarehouseRole)
+                            <div class="row g-3 mb-3">
+                                <div class="col-12 col-lg-6">
+                                    <label for="payment_method" class="form-label">Metodo de Pago</label>
+                                    <select class="form-select" id="payment_method" name="payment_method" required>
+                                        <option value="">-- Seleccione --</option>
+                                        <option value="efectivo">Efectivo</option>
+                                        <option value="trans_bcp">Trans. BCP</option>
+                                        <option value="trans_bbva">Trans. BBVA</option>
+                                        <option value="yape">Yape</option>
+                                        <option value="plin">Plin</option>
+                                    </select>
+                                </div>
 
-                        <input type="hidden" id="amount_paid" name="amount_paid" value="0.00">
+                                <div class="col-12 col-lg-6">
+                                    <label for="status" class="form-label">Estado de Pedido</label>
+                                    <select class="form-select" id="status" name="status">
+                                        <option value="pending" selected>Pendiente</option>
+                                        <option value="in_progress">En curso</option>
+                                        <option value="delivered">Entregado</option>
+                                        <option value="cancelled">Anulado</option>
+                                    </select>
+                                </div>
 
-                        @if ($canManagePaymentStatuses)
+                                <div class="col-12 col-lg-6">
+                                    <label class="form-label" for="payment_status">Estado de Pago</label>
+                                    <select class="form-select" id="payment_status" name="payment_status" required>
+                                        <option value="pending" selected>Pendiente</option>
+                                        @if ($canManagePaymentStatuses)
+                                            <option value="to_collect">Saldo pendiente</option>
+                                            <option value="change">Vuelto pendiente</option>
+                                        @endif
+                                        <option value="paid">Pagado</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12 col-lg-6">
+                                    <label for="amount_paid" class="form-label">Monto Pagado</label>
+                                    <input type="number" step="0.01" min="0" class="form-control"
+                                        id="amount_paid" name="amount_paid" value="0.00">
+                                </div>
+
+                            </div>
+                        @else
+                            <input type="hidden" id="status" name="status" value="pending">
+                            <input type="hidden" id="amount_paid" name="amount_paid" value="0.00">
+                        @endif
+
+                        @if ($canManagePaymentStatuses && !$isWarehouseRole)
                             <div class="row g-3 mb-3 d-none" id="detailEditorPanel">
                                 <div class="col-md-6">
                                     <label for="detail_order_status" class="form-label">Estado de Pedido</label>
@@ -177,12 +225,13 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label for="detail_amount_paid" class="form-label">Monto Pagado</label>
-                                    <input type="number" step="0.01" min="0" class="form-control" id="detail_amount_paid" value="0.00">
+                                    <input type="number" step="0.01" min="0" class="form-control"
+                                        id="detail_amount_paid" value="0.00">
                                 </div>
                             </div>
                         @endif
 
-                        <div class="mb-1">
+                        <div class="mb-1 {{ $isWarehouseRole ? 'd-none' : '' }}">
                             <div class="d-flex align-items-center justify-content-between">
                                 <h5 class="mb-0">Productos</h5>
                                 <button type="button" class="btn btn-sm btn-info" id="addProductRow">+ Agregar
