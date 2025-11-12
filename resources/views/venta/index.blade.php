@@ -158,8 +158,9 @@
                                         <option value="paid">Pagado</option>
                                     </select>
                                 </div>
+                            @else
+                                <input type="hidden" id="payment_status" name="payment_status" value="pending">
                             @endif
-
                             <div class="col-md-4 {{ $isWarehouseRole ? 'd-none' : '' }}">
                                 <label for="total_price" class="form-label">Total</label>
                                 <input type="number" step="0.01" class="form-control" id="total_price"
@@ -189,18 +190,6 @@
                                         <option value="in_progress">En curso</option>
                                         <option value="delivered">Entregado</option>
                                         <option value="cancelled">Anulado</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-12 col-lg-6">
-                                    <label class="form-label" for="payment_status">Estado de Pago</label>
-                                    <select class="form-select" id="payment_status" name="payment_status" required>
-                                        <option value="pending" selected>Pendiente</option>
-                                        @if ($canManagePaymentStatuses)
-                                            <option value="to_collect">Saldo pendiente</option>
-                                            <option value="change">Vuelto pendiente</option>
-                                        @endif
-                                        <option value="paid">Pagado</option>
                                     </select>
                                 </div>
 

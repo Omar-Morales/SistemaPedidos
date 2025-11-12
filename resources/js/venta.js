@@ -68,6 +68,25 @@ let editingDetailId = null;
 let hiddenDetails = [];
 let forcedWarehousePaymentStatus = null;
 
+function formatWarehouseAmount(value) {
+    if (!Number.isFinite(value) || value <= 0) {
+        return '';
+    }
+
+    const fixed = value.toFixed(2);
+    if (fixed.endsWith('.00')) {
+        return parseInt(fixed, 10).toString();
+    }
+    return fixed;
+}
+
+function setWarehouseAmountInput(value) {
+    if (!isWarehouseRole || !amountPaidInput) {
+        return;
+    }
+    amountPaidInput.value = formatWarehouseAmount(value);
+}
+
 function ensureReadOnlyPaymentStatusOption(value) {
     if (!paymentStatusSelect) {
         return null;
@@ -261,32 +280,32 @@ function resetearModalVenta(forNewSale = true) {
     }
 
     if (totalInput) totalInput.value = '0.00';
-    if (amountPaidInput) amountPaidInput.value = '0.00';
+    if (amountPaidInput) amountPaidInput.value = isWarehouseRole ? '' : '0.00';
     if (paymentStatusSelect) {
         const allowExtended = forNewSale ? false : hasExtendedPaymentPrivileges();
         const allowedStatuses = allowExtended ? adminPaymentStatuses : basePaymentStatuses;
         paymentStatusSelect.disabled = false;
         paymentStatusSelect.dataset.allowExtended = allowExtended ? 'true' : 'false';
-        if (!allowedStatuses.includes(paymentStatusSelect.value)) {
-            paymentStatusSelect.value = 'pending';
-        }
+        paymentStatusSelect.value = 'pending';
 
-        const existingValues = Array.from(paymentStatusSelect.options).map(option => option.value);
-        if (!allowExtended) {
-            Array.from(paymentStatusSelect.options).forEach(option => {
-                if (!allowedStatuses.includes(option.value)) {
-                    option.remove();
-                }
-            });
-        } else {
-            adminPaymentStatuses.forEach(status => {
-                if (!existingValues.includes(status)) {
-                    const option = document.createElement('option');
-                    option.value = status;
-                    option.textContent = paymentStatusText[status] ?? status;
-                    paymentStatusSelect.appendChild(option);
-                }
-            });
+        if (!isWarehouseRole && paymentStatusSelect.tagName === 'SELECT') {
+            const existingValues = Array.from(paymentStatusSelect.options).map(option => option.value);
+            if (!allowExtended) {
+                Array.from(paymentStatusSelect.options).forEach(option => {
+                    if (!allowedStatuses.includes(option.value)) {
+                        option.remove();
+                    }
+                });
+            } else {
+                adminPaymentStatuses.forEach(status => {
+                    if (!existingValues.includes(status)) {
+                        const option = document.createElement('option');
+                        option.value = status;
+                        option.textContent = paymentStatusText[status] ?? status;
+                        paymentStatusSelect.appendChild(option);
+                    }
+                });
+            }
         }
     }
 
@@ -387,7 +406,15 @@ function handleWarehouseStatusChange(newStatus) {
     }
 
     if (isCancelled && amountPaidInput) {
-        amountPaidInput.value = '0.00';
+        amountPaidInput.value = isWarehouseRole ? '' : '0.00';
+    }
+
+    if (isWarehouseRole) {
+        if (isCancelled) {
+            setWarehousePaymentStatus('cancelled');
+        } else {
+            updateWarehousePaymentStatusFromAmounts();
+        }
     }
 
     calcularTotal();
@@ -426,6 +453,39 @@ function getActiveEditableRow() {
     }
     const nodes = detalleEditableDT.rows({ page: 'all' }).nodes().toArray();
     return nodes.length ? nodes[0] : null;
+}
+
+function setWarehousePaymentStatus(status) {
+    if (!isWarehouseRole || !paymentStatusSelect) {
+        return;
+    }
+    const normalizedStatus = forcedWarehousePaymentStatus || status || 'pending';
+    paymentStatusSelect.value = normalizedStatus;
+
+    const activeRow = getActiveEditableRow();
+    if (activeRow) {
+        const hidden = getHiddenFields(activeRow);
+        if (hidden?.paymentStatus) {
+            hidden.paymentStatus.value = normalizedStatus;
+        }
+    }
+}
+
+function updateWarehousePaymentStatusFromAmounts() {
+    if (!isWarehouseRole || !paymentStatusSelect) {
+        return;
+    }
+
+    const activeRow = getActiveEditableRow();
+    if (!activeRow) {
+        return;
+    }
+
+    const subtotalInput = activeRow.querySelector('.subtotal-input');
+    const subtotal = subtotalInput ? parseFloat(subtotalInput.value) || 0 : 0;
+    const amount = amountPaidInput ? Math.max(0, parseFloat(amountPaidInput.value) || 0) : 0;
+    const computedStatus = computePaymentStatus(subtotal, amount);
+    setWarehousePaymentStatus(computedStatus);
 }
 
 function syncDetailEditorsFromRow() {
@@ -513,6 +573,34 @@ if (detailAmountPaidInput) {
             hidden.difference.value = (subtotal - amount).toFixed(2);
         }
 
+        calcularTotal();
+    });
+}
+
+if (amountPaidInput && isWarehouseRole) {
+    amountPaidInput.addEventListener('input', () => {
+        if (!detalleEditableDT) {
+            return;
+        }
+
+        const activeRow = getActiveEditableRow();
+        if (!activeRow) {
+            return;
+        }
+
+        const amount = Math.max(0, parseFloat(amountPaidInput.value) || 0);
+        const hidden = getHiddenFields(activeRow);
+        const subtotalInput = activeRow.querySelector('.subtotal-input');
+        const subtotal = subtotalInput ? parseFloat(subtotalInput.value) || 0 : 0;
+
+        if (hidden.amount) {
+            hidden.amount.value = amount.toFixed(2);
+        }
+        if (hidden.difference) {
+            hidden.difference.value = (subtotal - amount).toFixed(2);
+        }
+
+        updateWarehousePaymentStatusFromAmounts();
         calcularTotal();
     });
 }
@@ -756,7 +844,9 @@ function computePaymentStatus(total, amountPaid) {
 function calcularTotal() {
     if (!detalleEditableDT) {
         if (totalInput) totalInput.value = '0.00';
-        if (amountPaidInput) amountPaidInput.value = '0.00';
+        if (amountPaidInput) {
+            amountPaidInput.value = isWarehouseRole ? '' : '0.00';
+        }
         return;
     }
 
@@ -832,14 +922,21 @@ function calcularTotal() {
     });
 
     if (totalInput) totalInput.value = total.toFixed(2);
-    if (amountPaidInput) amountPaidInput.value = amountPaid.toFixed(2);
+    if (amountPaidInput && !isWarehouseRole) {
+        amountPaidInput.value = amountPaid.toFixed(2);
+    }
 
     const ventaStatus = resolveVentaStatusFromDetails(statuses);
     setStatusValue(ventaStatus);
 
-    const paymentStatus = computePaymentStatus(total, amountPaid);
+    let paymentStatus = computePaymentStatus(total, amountPaid);
+    if (forcedWarehousePaymentStatus) {
+        paymentStatus = forcedWarehousePaymentStatus;
+    }
     if (paymentStatusSelect) {
-        if (isEditingVenta) {
+        if (isWarehouseRole) {
+            setWarehousePaymentStatus(paymentStatus);
+        } else if (isEditingVenta) {
             if (!getAvailablePaymentStatuses().includes(paymentStatusSelect.value)) {
                 paymentStatusSelect.value = 'pending';
             }
@@ -898,7 +995,7 @@ function applyGlobalSelection(field, rawValue) {
     }
 }
 
-if (paymentStatusSelect) {
+if (paymentStatusSelect && !isWarehouseRole) {
     paymentStatusSelect.addEventListener('change', () => {
         if (!detalleEditableDT) {
             calcularTotal();
@@ -1105,6 +1202,11 @@ function agregarFilaProducto(data = {}) {
         syncGlobalSelectorsWithRow(lastRowNode);
     }
 
+    if (isWarehouseRole) {
+        setWarehouseAmountInput(amountValue);
+        updateWarehousePaymentStatusFromAmounts();
+    }
+
     calcularTotal();
     if (isEditingVenta && canUseDetailEditors) {
         syncDetailEditorsFromRow();
@@ -1139,10 +1241,12 @@ $(document).on('click', '.remove-row', function () {
 
     calcularTotal();
 
-    if (table.rows().count() === 0 && hiddenDetails.length === 0) {
-        if (totalInput) totalInput.value = '0.00';
-        if (amountPaidInput) amountPaidInput.value = '0.00';
-    }
+        if (table.rows().count() === 0 && hiddenDetails.length === 0) {
+            if (totalInput) totalInput.value = '0.00';
+            if (amountPaidInput) {
+                amountPaidInput.value = isWarehouseRole ? '' : '0.00';
+            }
+        }
 });
 
 formVenta.addEventListener('submit', function (e) {
@@ -1386,7 +1490,14 @@ $(document).on('click', '.edit-btn', async function () {
             $('#payment_method').val(currentPaymentMethod).trigger('change');
         }
         $('#total_price').val(parseFloat(venta.total).toFixed(2));
-        if (amountPaidInput) amountPaidInput.value = parseFloat(venta.amount_paid).toFixed(2);
+        if (amountPaidInput) {
+            const parsedAmount = parseFloat(venta.amount_paid);
+            if (isWarehouseRole) {
+                setWarehouseAmountInput(parsedAmount);
+            } else {
+                amountPaidInput.value = Number.isFinite(parsedAmount) ? parsedAmount.toFixed(2) : '0.00';
+            }
+        }
         if (paymentStatusSelect) {
             const currentStatus = venta.payment_status || 'pending';
             const isCancelledStatus = currentStatus === 'cancelled';
