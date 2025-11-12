@@ -61,8 +61,8 @@ $permissions = [
             ['name' => 'administrar.ventas.delete', 'description' => 'Eliminar Ventas'],
 
             // Inventario
-            ['name' => 'administrar.inventarios.index', 'description' => 'Ver listado de Inventarios'],
-            ['name' => 'administrar.inventarios.export', 'description' => 'Exportar Inventario'],
+            ['name' => 'administrar.inventarios.index', 'description' => 'Ver Cierre Diario'],
+            ['name' => 'administrar.inventarios.export', 'description' => 'Exportar Cierre Diario'],
 
         ];
 

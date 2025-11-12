@@ -65,6 +65,30 @@ let editingDetailId = null;
 let hiddenDetails = [];
 let forcedWarehousePaymentStatus = null;
 
+function ensureReadOnlyPaymentStatusOption(value) {
+    if (!paymentStatusSelect) {
+        return null;
+    }
+
+    let option = paymentStatusSelect.querySelector(`option[value="${value}"]`);
+    if (!option) {
+        option = document.createElement('option');
+        option.value = value;
+        option.textContent = paymentStatusText[value] || value;
+        option.setAttribute('data-auto-status', 'true');
+        paymentStatusSelect.appendChild(option);
+    }
+
+    option.disabled = true;
+    option.dataset.readonly = 'true';
+    option.hidden = true;
+    if (option.style?.display === 'none') {
+        option.style.display = '';
+    }
+
+    return option;
+}
+
 if (statusField && isWarehouseRole) {
     statusField.addEventListener('change', () => {
         const newStatus = getStatusValue();
@@ -200,6 +224,7 @@ function resetearModalVenta(forNewSale = true) {
     formVenta.reset();
     $('#venta_id').val('');
     setStatusValue('pending');
+    forcedWarehousePaymentStatus = null;
     if (forNewSale) {
         isEditingVenta = false;
     }
@@ -322,52 +347,47 @@ function propagateStatusToDetails(newStatus) {
 }
 
 function handleWarehouseStatusChange(newStatus) {
-    propagateStatusToDetails(newStatus);
-
+    const editingSingleDetail = Boolean(editingDetailId);
     const isCancelled = newStatus === 'cancelled';
-    forcedWarehousePaymentStatus = isCancelled ? 'cancelled' : null;
+
+    if (!isWarehouseRole && !editingSingleDetail) {
+        propagateStatusToDetails(newStatus);
+        return;
+    }
+
+    if (isWarehouseRole) {
+        forcedWarehousePaymentStatus = isCancelled ? 'cancelled' : null;
+    }
+
+    const activeRow = getActiveEditableRow();
+
+    if (activeRow) {
+        const hidden = getHiddenFields(activeRow);
+        if (hidden.orderStatus) {
+            hidden.orderStatus.value = newStatus;
+        }
+
+            if (hidden.paymentStatus && isCancelled) {
+                hidden.paymentStatus.value = 'cancelled';
+                ensureReadOnlyPaymentStatusOption('cancelled');
+            }
+
+        if (hidden.amount && isCancelled) {
+            hidden.amount.value = '0.00';
+        }
+
+        if (hidden.difference && isCancelled) {
+            const subtotalInput = activeRow.querySelector('.subtotal-input');
+            const subtotal = subtotalInput ? parseFloat(subtotalInput.value) || 0 : 0;
+            hidden.difference.value = subtotal.toFixed(2);
+        }
+    }
 
     if (isCancelled && amountPaidInput) {
         amountPaidInput.value = '0.00';
     }
 
-    if (detalleEditableDT) {
-        detalleEditableDT.rows().every(function () {
-            const row = this.node();
-            const hidden = getHiddenFields(row);
-            if (!hidden) return;
-
-            if (hidden.paymentStatus) {
-                if (isCancelled) {
-                    hidden.paymentStatus.value = 'cancelled';
-                }
-            }
-
-            if (isCancelled && hidden.amount) {
-                hidden.amount.value = '0.00';
-            }
-            if (isCancelled && hidden.difference) {
-                const subtotalInput = row?.querySelector('.subtotal-input');
-                const subtotal = subtotalInput ? parseFloat(subtotalInput.value) || 0 : 0;
-                hidden.difference.value = subtotal.toFixed(2);
-            }
-        });
-    }
-
-    hiddenDetails = hiddenDetails.map(detail => {
-        const updated = { ...detail, status: newStatus };
-        if (isCancelled) {
-            updated.amount_paid = 0;
-            updated.difference = parseFloat(detail.subtotal) || 0;
-            updated.payment_status = isCancelled ? 'cancelled' : detail.payment_status;
-        }
-        return updated;
-    });
-
-    if (isCancelled) {
-        calcularTotal();
-        applyGlobalSelection('payment_status', 'cancelled');
-    }
+    calcularTotal();
 }
 
 function syncGlobalSelectorsWithRow(row) {
@@ -1311,6 +1331,7 @@ $(document).on('click', '.edit-btn', async function () {
     const targetDetail = $(this).data('detail-id');
 
     resetearModalVenta(false);
+    forcedWarehousePaymentStatus = null;
     isEditingVenta = true;
     editingDetailId = typeof targetDetail !== 'undefined' ? String(targetDetail) : null;
     hiddenDetails = [];
@@ -1366,20 +1387,21 @@ $(document).on('click', '.edit-btn', async function () {
         if (paymentStatusSelect) {
             const currentStatus = venta.payment_status || 'pending';
             const isCancelledStatus = currentStatus === 'cancelled';
-            paymentStatusSelect.disabled = isCancelledStatus;
+            if (isCancelledStatus) {
+                ensureReadOnlyPaymentStatusOption('cancelled');
+            }
+
+            if (!isWarehouseRole) {
+                paymentStatusSelect.disabled = isCancelledStatus;
+            } else {
+                paymentStatusSelect.disabled = false;
+            }
             paymentStatusSelect.dataset.allowExtended = (!isCancelledStatus && hasExtendedPaymentPrivileges())
                 ? 'true'
                 : 'false';
 
             if (!getAvailablePaymentStatuses().includes(currentStatus)) {
-                let option = paymentStatusSelect.querySelector(`option[value="${currentStatus}"]`);
-                if (!option) {
-                    option = document.createElement('option');
-                    option.value = currentStatus;
-                    option.textContent = paymentStatusText[currentStatus] || currentStatus;
-                    option.setAttribute('data-auto-status', 'true');
-                    paymentStatusSelect.appendChild(option);
-                }
+                ensureReadOnlyPaymentStatusOption(currentStatus);
             }
 
             paymentStatusSelect.value = currentStatus;
@@ -1390,6 +1412,7 @@ $(document).on('click', '.edit-btn', async function () {
         inicializarDataTableEditable();
 
         let selectedDetailStatus = venta.payment_status ?? 'pending';
+        let currentDetailOrderStatus = null;
 
         if (Array.isArray(venta.detalle)) {
             let displayedCount = 0;
@@ -1426,6 +1449,7 @@ $(document).on('click', '.edit-btn', async function () {
                 displayedCount += 1;
 
                 selectedDetailStatus = paymentStatusNormalized;
+                currentDetailOrderStatus = item.status ?? currentDetailOrderStatus;
             });
 
             if (editingDetailId && displayedCount === 0 && hiddenDetails.length > 0) {
@@ -1434,6 +1458,7 @@ $(document).on('click', '.edit-btn', async function () {
                 selectedDetailStatus = validPaymentStatuses.includes(fallbackDetail.payment_status)
                     ? fallbackDetail.payment_status
                     : 'pending';
+                currentDetailOrderStatus = fallbackDetail.status ?? currentDetailOrderStatus;
             }
 
             calcularTotal();
@@ -1441,22 +1466,27 @@ $(document).on('click', '.edit-btn', async function () {
             totalInput.value = parseFloat(venta.total).toFixed(2);
         }
 
+        if (isWarehouseRole) {
+            forcedWarehousePaymentStatus = currentDetailOrderStatus === 'cancelled' ? 'cancelled' : null;
+        }
+
         if (paymentStatusSelect) {
-            const valueToApply = venta.payment_status ?? selectedDetailStatus ?? 'pending';
-            const isCancelledValue = valueToApply === 'cancelled';
-            paymentStatusSelect.disabled = isCancelledValue;
-            paymentStatusSelect.dataset.allowExtended = (!isCancelledValue && hasExtendedPaymentPrivileges())
+            const valueToApply = editingDetailId
+                ? (selectedDetailStatus ?? 'pending')
+                : (venta.payment_status ?? selectedDetailStatus ?? 'pending');
+            const disableSelect = editingDetailId && valueToApply === 'cancelled';
+
+            if (valueToApply === 'cancelled') {
+                ensureReadOnlyPaymentStatusOption('cancelled');
+            }
+
+            paymentStatusSelect.disabled = disableSelect;
+            paymentStatusSelect.dataset.allowExtended = (!disableSelect && hasExtendedPaymentPrivileges())
                 ? 'true'
                 : 'false';
+
             if (!getAvailablePaymentStatuses().includes(valueToApply)) {
-                let option = paymentStatusSelect.querySelector(`option[value="${valueToApply}"]`);
-                if (!option) {
-                    option = document.createElement('option');
-                    option.value = valueToApply;
-                    option.textContent = paymentStatusText[valueToApply] || valueToApply;
-                    option.setAttribute('data-auto-status', 'true');
-                    paymentStatusSelect.appendChild(option);
-                }
+                ensureReadOnlyPaymentStatusOption(valueToApply);
             }
 
             paymentStatusSelect.value = valueToApply;
