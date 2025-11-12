@@ -1,6 +1,10 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 
+const userRoles = (document.body.dataset.userRoles || '').toLowerCase();
+const warehouseRoles = ['curva', 'milla', 'santa carolina'];
+const IS_WAREHOUSE_ROLE = warehouseRoles.some(role => userRoles.includes(role));
 
+﻿
 
 axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]').content;
 
@@ -28,9 +32,10 @@ let table = $('#productsTable').DataTable({
     { data:'product_code', name:'products.product_code', defaultContent: '-' },
     { data:'category_name', name:'category.name' },
 
-    { data:'price' },
-
-    { data:'quantity' },
+    ...(!IS_WAREHOUSE_ROLE ? [
+        { data:'price' },
+        { data:'quantity' },
+    ] : []),
 
     { data:'estado', name:'estado' },
 
