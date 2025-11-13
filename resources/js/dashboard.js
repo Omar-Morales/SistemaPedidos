@@ -817,7 +817,7 @@ function animateCounter(elementId, endValue, duration = 500) {
         return;
     }
 
-    // Mostrar el wrapper del nÃºmero
+    // Mostrar el wrapper del número
     const wrapper = el.closest('h2');
     if (wrapper && wrapper.classList.contains('opacity-0')) {
         wrapper.classList.remove('opacity-0');
@@ -982,3 +982,4 @@ function normalizeMonthKey(year, monthIndex) {
     const normalizedMonth = String(monthIndex + 1).padStart(2, '0');
     return `${year}-${normalizedMonth}`;
 }
+

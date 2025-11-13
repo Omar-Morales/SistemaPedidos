@@ -46,7 +46,7 @@
 
         <div class="main-content">
 
-            <!-- Spinner SOLO para el Ã¡rea de contenido
+            <!-- Spinner SOLO para el área de contenido
         <div id="main-loader" class="content-preloader">
             <div class="spinner"></div>
         </div>-->
@@ -81,3 +81,4 @@
 </div>
 
 </html>
+
