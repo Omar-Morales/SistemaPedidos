@@ -1776,7 +1776,7 @@ $(document).on('select2:select', '.product-select', function (e) {
 
     if (productoYaExiste(selectedProductId, currentRow)) {
         Toastify({
-            text: 'Este producto ya est seleccionado en otra fila.',
+            text: 'Este producto ya está seleccionado en otra fila.',
             duration: 3000,
             gravity: 'top',
             position: 'right',

@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-layout="vertical" data-topbar="light" data-sidebar="light"
     data-sidebar-size="lg" data-sidebar-image="none" data-layout-style="" data-layout-mode="dark" data-layout-width=""
     data-layout-position="scrolled">
@@ -46,7 +46,7 @@
 
         <div class="main-content">
 
-            <!-- Spinner SOLO para el área de contenido
+            <!-- Spinner SOLO para el Ã¡rea de contenido
         <div id="main-loader" class="content-preloader">
             <div class="spinner"></div>
         </div>-->
