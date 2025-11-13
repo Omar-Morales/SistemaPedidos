@@ -44,6 +44,10 @@ class DashboardController extends Controller
 
         $compras = Compra::select(DB::raw("SUM(total_cost) as total"), DB::raw("TO_CHAR(purchase_date, 'YYYY-MM') as month"))
             ->where('purchase_date', '>=', $comparisonStart)
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhereIn('status', ['completed', 'pending']);
+            })
             ->groupBy('month')
             ->orderBy('month')
             ->get();
@@ -59,7 +63,11 @@ class DashboardController extends Controller
 
         // Métricas mensuales del mes en curso
         $ventasMensualesQuery = Venta::whereBetween('sale_date', [$startOfMonth, $endOfMonth]);
-        $comprasMensualesQuery = Compra::whereBetween('purchase_date', [$startOfMonth, $endOfMonth]);
+        $comprasMensualesQuery = Compra::whereBetween('purchase_date', [$startOfMonth, $endOfMonth])
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhereIn('status', ['completed', 'pending']);
+            });
 
         $totalVentasMes = (clone $ventasMensualesQuery)->sum('total_price');
         $totalComprasMes = (clone $comprasMensualesQuery)->sum('total_cost');
