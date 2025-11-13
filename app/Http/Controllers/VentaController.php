@@ -1410,8 +1410,31 @@ class VentaController extends Controller
             });
         }
 
+        $statusOrderExpression = "CASE
+                WHEN LOWER(detalle_ventas.status) = 'pending' THEN 0
+                WHEN LOWER(detalle_ventas.status) = 'in_progress' THEN 1
+                WHEN LOWER(detalle_ventas.status) = 'delivered' THEN 2
+                WHEN LOWER(detalle_ventas.status) = 'cancelled' THEN 3
+                ELSE 4
+            END";
+
+        $paymentStatusOrderExpression = "CASE
+                WHEN LOWER(detalle_ventas.payment_status) = 'pending' THEN 0
+                WHEN LOWER(detalle_ventas.payment_status) = 'change' THEN 1
+                WHEN LOWER(detalle_ventas.payment_status) = 'to_collect' THEN 2
+                WHEN LOWER(detalle_ventas.payment_status) = 'paid' THEN 3
+                WHEN LOWER(detalle_ventas.payment_status) = 'cancelled' THEN 4
+                ELSE 5
+            END";
+
         return DataTables::of($detalles)
             ->orderColumn('row_number', 'row_number $1')
+            ->orderColumn('detalle_ventas.status', function ($query, $order) use ($statusOrderExpression) {
+                $query->orderByRaw("{$statusOrderExpression} {$order}");
+            })
+            ->orderColumn('detalle_ventas.payment_status', function ($query, $order) use ($paymentStatusOrderExpression) {
+                $query->orderByRaw("{$paymentStatusOrderExpression} {$order}");
+            })
             ->addColumn('row_number', fn ($detalle) => (int) ($detalle->row_number ?? 0))
             ->addColumn('id', fn ($detalle) => $detalle->sale_id)
             ->addColumn('fecha', fn ($detalle) => Carbon::parse($detalle->sale_date)->format('d/m/Y'))
@@ -1493,7 +1516,8 @@ class VentaController extends Controller
                 $acciones = '';
 
                 $detalleEntregado = ($detalle->detalle_status === 'delivered');
-                $shouldHideEditForSupervisor = $isSupervisor && $detalleEntregado;
+                $detallePagoCompletado = ($detalle->detalle_payment_status === 'paid');
+                $shouldHideEditForSupervisor = $isSupervisor && $detalleEntregado && $detallePagoCompletado;
 
                 if ($currentUser && $currentUser->can('administrar.ventas.edit') && ! $shouldHideEditForSupervisor) {
                     $acciones .= '

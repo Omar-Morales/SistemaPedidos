@@ -716,7 +716,12 @@ const table = $('#ventasTable').DataTable({
     responsive: true,
     autoWidth: false,
     pageLength: 10,
-    order: [[0, 'desc']],
+    order: [
+        [12, 'asc'], // estado de pedido
+        [11, 'asc'], // estado de pago
+        [1, 'desc'], // fecha
+        [0, 'desc'], // correlativo
+    ],
     dom: 'Bfrtip',
     buttons: [
         {
