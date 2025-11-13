@@ -18,10 +18,6 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified','active'])->name('dashboard');
-
 Route::middleware('auth')->group(function () {
     Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('password.update');
