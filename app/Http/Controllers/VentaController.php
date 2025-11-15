@@ -84,20 +84,30 @@ class VentaController extends Controller
     {
         $normalized = strtolower($status ?? '');
 
-        if (in_array($normalized, ['pending', 'paid', 'to_collect', 'change', 'cancelled'], true)) {
-            return $normalized;
+        if ($normalized === 'cancelled') {
+            return 'cancelled';
         }
 
-        if ($amountPaid >= $subtotal && $subtotal > 0) {
+        $difference = round($subtotal - $amountPaid, 2);
+
+        if ($difference < 0) {
+            return 'change';
+        }
+
+        if ($amountPaid <= 0) {
+            return 'pending';
+        }
+
+        if (abs($difference) <= 0.009 && $subtotal > 0) {
             return 'paid';
         }
 
-        if ($amountPaid > 0 && $amountPaid < $subtotal) {
+        if ($amountPaid > 0 && $difference > 0) {
             return 'to_collect';
         }
 
-        if ($amountPaid > $subtotal && $subtotal > 0) {
-            return 'change';
+        if (in_array($normalized, ['pending', 'paid', 'to_collect', 'change'], true)) {
+            return $normalized;
         }
 
         return 'pending';
@@ -713,6 +723,13 @@ class VentaController extends Controller
                 'difference' => (float) $venta->difference,
                 'codigo' => $venta->codigo,
                 'detalle' => $venta->detalles->map(function (DetalleVenta $detalle) use ($venta) {
+                    $difference = $detalle->difference ?? round($detalle->subtotal - $detalle->amount_paid, 2);
+                    $displayPaymentStatus = $this->normalizeDetailPaymentStatus(
+                        $detalle->payment_status,
+                        $detalle->subtotal,
+                        $detalle->amount_paid
+                    );
+
                     return [
                         'id' => $detalle->id,
                         'product_id' => $detalle->product_id,
@@ -721,11 +738,9 @@ class VentaController extends Controller
                         'unit_price' => $detalle->unit_price,
                         'subtotal' => $detalle->subtotal,
                         'status' => $detalle->status,
-                        'payment_status' => in_array($detalle->payment_status, ['pending', 'paid', 'to_collect', 'change', 'cancelled'], true)
-                            ? $detalle->payment_status
-                            : 'pending',
+                        'payment_status' => $displayPaymentStatus,
                         'amount_paid' => $detalle->amount_paid,
-                        'difference' => $detalle->difference,
+                        'difference' => $difference,
                         'warehouse' => $this->normalizeWarehouseValue($detalle->warehouse ?? $venta->warehouse),
                         'delivery_type' => $detalle->delivery_type,
                         'payment_method' => $this->normalizePaymentMethod($detalle->payment_method) ?? 'efectivo',
@@ -1489,7 +1504,13 @@ class VentaController extends Controller
             })
             ->addColumn('metodo_pago', fn ($detalle) => $this->paymentMethodLabel($detalle->detalle_payment_method))
             ->addColumn('estado_pago', function ($detalle) {
-                return match ($detalle->detalle_payment_status) {
+                $displayPaymentStatus = $this->normalizeDetailPaymentStatus(
+                    $detalle->detalle_payment_status,
+                    (float) $detalle->subtotal,
+                    (float) $detalle->amount_paid
+                );
+
+                return match ($displayPaymentStatus) {
                     'paid' => '<span class="badge bg-success p-2">Pagado</span>',
                     'to_collect' => '<span class="badge bg-info text-dark p-2">Saldo pendiente</span>',
                     'change' => '<span class="badge bg-secondary p-2">Vuelto pendiente</span>',
@@ -1516,7 +1537,12 @@ class VentaController extends Controller
                 $acciones = '';
 
                 $detalleEntregado = ($detalle->detalle_status === 'delivered');
-                $detallePagoCompletado = ($detalle->detalle_payment_status === 'paid');
+                $detallePaymentStatus = $this->normalizeDetailPaymentStatus(
+                    $detalle->detalle_payment_status,
+                    (float) $detalle->subtotal,
+                    (float) $detalle->amount_paid
+                );
+                $detallePagoCompletado = ($detallePaymentStatus === 'paid');
                 $shouldHideEditForSupervisor = $isSupervisor && $detalleEntregado && $detallePagoCompletado;
 
                 if ($currentUser && $currentUser->can('administrar.ventas.edit') && ! $shouldHideEditForSupervisor) {
@@ -1574,6 +1600,13 @@ class VentaController extends Controller
                 $nombreBase .= ' (archivado)';
             }
 
+            $difference = $item->difference ?? round($item->subtotal - $item->amount_paid, 2);
+            $displayPaymentStatus = $this->normalizeDetailPaymentStatus(
+                $item->payment_status,
+                $item->subtotal,
+                $item->amount_paid
+            );
+
             return [
                 'product_name' => $nombreBase,
                 'quantity' => $item->quantity,
@@ -1581,11 +1614,9 @@ class VentaController extends Controller
                 'unit_price' => $item->unit_price,
                 'subtotal' => $item->subtotal,
                 'amount_paid' => $item->amount_paid,
-                'difference' => $item->difference,
+                'difference' => $difference,
                 'status' => $item->status,
-                'payment_status' => in_array($item->payment_status, ['paid', 'pending', 'to_collect', 'change', 'cancelled'], true)
-                    ? $item->payment_status
-                    : 'pending',
+                'payment_status' => $displayPaymentStatus,
                 'warehouse' => $item->warehouse,
                 'delivery_type' => $item->delivery_type,
                 'payment_method' => $this->normalizePaymentMethod($item->payment_method) ?? 'efectivo',

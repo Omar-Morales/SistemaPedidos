@@ -932,7 +932,9 @@ function calcularTotal() {
     }
 
     const ventaStatus = resolveVentaStatusFromDetails(statuses);
-    setStatusValue(ventaStatus);
+    if (!editingDetailId) {
+        setStatusValue(ventaStatus);
+    }
 
     let paymentStatus = computePaymentStatus(total, amountPaid);
     if (forcedWarehousePaymentStatus) {
@@ -1480,7 +1482,6 @@ $(document).on('click', '.edit-btn', async function () {
         $('#sale_date').val(venta.fecha);
         $('#delivery_type').val(venta.delivery_type).trigger('change');
         $('#warehouse').val(venta.warehouse).trigger('change');
-        setStatusValue(venta.estado ?? 'pending');
 
         const $paymentMethodSelect = $('#payment_method');
         const currentPaymentMethod = normalizePaymentMethodValue(venta.payment_method || '');
@@ -1581,8 +1582,12 @@ $(document).on('click', '.edit-btn', async function () {
             }
 
             calcularTotal();
+            if (editingDetailId) {
+                setStatusValue(currentDetailOrderStatus ?? 'pending');
+            }
         } else {
             totalInput.value = parseFloat(venta.total).toFixed(2);
+            setStatusValue(venta.estado ?? 'pending');
         }
 
         if (isWarehouseRole) {
