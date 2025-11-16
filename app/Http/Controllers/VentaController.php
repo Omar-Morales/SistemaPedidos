@@ -481,7 +481,7 @@ class VentaController extends Controller
                 $paymentMethodDetalle = null;
             }
 
-            if ($quantity < 1 || !is_numeric($subtotal) || $subtotal < 0) {
+            if ($quantity < 0 || !is_numeric($subtotal) || $subtotal < 0) {
                 return response()->json([
                     'message' => "Detalle invalido en la posicion {$index}.",
                     'errors' => [
@@ -829,7 +829,7 @@ class VentaController extends Controller
             $unitInput = $item['unit'] ?? null;
             $amountPaid = isset($item['amount_paid']) ? max(0, (float) $item['amount_paid']) : 0;
 
-            if ($quantity < 1 || !is_numeric($subtotal) || $subtotal < 0) {
+            if ($quantity < 0 || !is_numeric($subtotal) || $subtotal < 0) {
                 return response()->json([
                     'message' => "Detalle invalido en la posicion {$index}.",
                     'errors' => [
@@ -1005,7 +1005,7 @@ class VentaController extends Controller
 
         Validator::make($detailInput, [
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|numeric|min:1',
+            'quantity' => 'required|numeric|min:0',
             'unit' => 'nullable|string|max:255',
             'subtotal' => 'required|numeric|min:0',
             'amount_paid' => 'nullable|numeric|min:0',

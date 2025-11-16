@@ -1173,7 +1173,7 @@ function agregarFilaProducto(data = {}) {
             <option value="">Seleccione un producto</option>
             ${options}
          </select>`,
-        `<input type="number" class="form-control quantity-input" min="1" value="${quantity}" required>`,
+        `<input type="number" class="form-control quantity-input" min="0" value="${quantity}">`,
         `<input type="number" class="form-control unit-input" min="0" step="0.01" value="${unitValue === '' ? '' : unitValue}" required>`,
         `<input type="number" class="form-control subtotal-input" step="0.01" min="0" value="${subtotal}" required>`,
         `<div class="d-flex align-items-center gap-2">
@@ -1280,7 +1280,7 @@ formVenta.addEventListener('submit', function (e) {
         const hiddenFields = getHiddenFields(row);
 
         const pid = select?.value;
-        const qty = parseFloat(qtyInput?.value);
+        const qty = qtyInput && qtyInput.value !== '' ? parseFloat(qtyInput.value) : 0;
         const unit = unitInput?.value.trim() || '';
         const subtotal = parseFloat(subtotalInput?.value);
         const amountPaid = hiddenFields.amount ? parseFloat(hiddenFields.amount.value) : 0;
@@ -1291,7 +1291,7 @@ formVenta.addEventListener('submit', function (e) {
         const deliveryValue = hiddenFields.deliveryType ? (hiddenFields.deliveryType.value || 'pickup') : ($('#delivery_type').val() || 'pickup');
         const paymentMethodValue = normalizePaymentMethodValue(hiddenFields.paymentMethod ? hiddenFields.paymentMethod.value : ($('#payment_method').val() || ''));
 
-        if (!pid || qty <= 0 || unit === '' || subtotal < 0 || Number.isNaN(subtotal) || Number.isNaN(amountPaid) || amountPaid < 0) {
+        if (!pid || qty < 0 || unit === '' || subtotal < 0 || Number.isNaN(subtotal) || Number.isNaN(amountPaid) || amountPaid < 0) {
             valido = false;
             return;
         }
