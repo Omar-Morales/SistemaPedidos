@@ -476,9 +476,9 @@
                                         <a class="dropdown-item top-clientes-range" data-range="1m" href="#">Ultimo
                                             mes</a>
                                         <a class="dropdown-item top-clientes-range active" data-range="6m"
-                                                href="#">Últimos 6 meses</a>
+                                            href="#">Últimos 6 meses</a>
                                         <a class="dropdown-item top-clientes-range" data-range="12m"
-                                                href="#">Últimos 12
+                                            href="#">Últimos 12
                                             meses</a>
                                         <a class="dropdown-item top-clientes-range" data-range="ytd" href="#">Año
                                             en
@@ -520,9 +520,9 @@
                                         <a class="dropdown-item ventas-distribucion-order" data-range="1m"
                                             href="#">Ultimo mes</a>
                                         <a class="dropdown-item ventas-distribucion-order" data-range="6m"
-                                                href="#">Últimos 6 meses</a>
+                                            href="#">Últimos 6 meses</a>
                                         <a class="dropdown-item ventas-distribucion-order" data-range="12m"
-                                                href="#">Últimos 12 meses</a>
+                                            href="#">Últimos 12 meses</a>
                                         <a class="dropdown-item ventas-distribucion-order" data-range="ytd"
                                             href="#">Año en curso</a>
                                     </div>
@@ -559,9 +559,9 @@
                                         <a class="dropdown-item ventas-compras-order" data-order="1m"
                                             href="#">Ultimo mes</a>
                                         <a class="dropdown-item ventas-compras-order" data-order="6m"
-                                                href="#">Últimos 6 meses</a>
+                                            href="#">Últimos 6 meses</a>
                                         <a class="dropdown-item ventas-compras-order" data-order="12m"
-                                                href="#">Últimos 12 meses</a>
+                                            href="#">Últimos 12 meses</a>
                                         <a class="dropdown-item ventas-compras-order" data-order="ytd" href="#">Año
                                             en curso</a>
                                     </div>
@@ -612,9 +612,9 @@
                                         <a class="dropdown-item orders-performance-range" data-range="1m"
                                             href="#">Ultimo mes</a>
                                         <a class="dropdown-item orders-performance-range active" data-range="6m"
-                                                href="#">Últimos 6 meses</a>
+                                            href="#">Últimos 6 meses</a>
                                         <a class="dropdown-item orders-performance-range" data-range="12m"
-                                                href="#">Últimos 12 meses</a>
+                                            href="#">Últimos 12 meses</a>
                                         <a class="dropdown-item orders-performance-range" data-range="ytd"
                                             href="#">Año en curso</a>
                                     </div>
@@ -662,85 +662,9 @@
 @endsection
 
 
-
 @push('scripts')
     <script src="{{ asset('assets/libs/echarts/echarts.min.js') }}"></script>
     <script src="{{ asset('assets/libs/apexcharts/apexcharts.min.js') }}"></script>
 
-
-
     @vite('resources/js/dashboard.js')
-@endpush
-
-@push('styles')
-    <style>
-        h2 {
-
-            transition: opacity 0.3s ease-in-out;
-
-
-
-        }
-
-
-
-        .summary-card .card-body {
-
-            display: flex;
-
-            flex-direction: column;
-
-            height: 100%;
-
-        }
-
-
-
-        .summary-card .summary-meta {
-
-            margin-top: auto;
-
-        }
-
-
-
-        .summary-card .card-body {
-
-            justify-content: space-between;
-
-            gap: 0.75rem;
-
-        }
-
-
-        .summary-card .summary-meta {
-
-            margin-top: 0;
-
-        }
-
-        #topClientesChart .apexcharts-legend {
-            display: flex !important;
-            justify-content: center;
-            gap: 1.5rem;
-            flex-wrap: wrap;
-            margin-top: 0.75rem;
-        }
-
-        #topClientesChart .apexcharts-legend-series {
-            display: inline-flex !important;
-            align-items: center;
-            gap: 0.4rem;
-            color: #6c757d;
-            font-size: 13px;
-        }
-
-        #topClientesChart .apexcharts-legend-marker.legend-dot {
-            width: 12px !important;
-            height: 12px !important;
-            border-radius: 4px;
-            border: none !important;
-            display: inline-block;
-        }
-    </style>
 @endpush
