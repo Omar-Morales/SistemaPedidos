@@ -668,3 +668,11 @@
 
     @vite('resources/js/dashboard.js')
 @endpush
+
+@push('styles')
+    <style>
+        .page-title-box {
+            margin-top: -42px !important;
+        }
+    </style>
+@endpush

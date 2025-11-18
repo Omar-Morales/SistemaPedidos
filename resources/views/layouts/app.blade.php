@@ -17,6 +17,7 @@
         })();
     </script>
     @include('partials.head')
+    @stack('styles')
     <style>
         .page-content {
             padding-top: 75px !important;
