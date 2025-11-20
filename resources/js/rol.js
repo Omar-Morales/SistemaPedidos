@@ -262,8 +262,9 @@ $(document).on('click', '.delete-btn', function () {
                 })
                 .catch(error => {
                     console.error(error);
+                    const message = error?.response?.data?.message ?? "Error al eliminar el rol";
                     Toastify({
-                        text: "Error al eliminar el rol",
+                        text: message,
                         backgroundColor: "#dc3545",
                         duration: 3000
                     }).showToast();

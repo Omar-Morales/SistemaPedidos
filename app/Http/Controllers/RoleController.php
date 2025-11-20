@@ -96,7 +96,14 @@ class RoleController extends Controller
      */
     public function destroy(string $id)
     {
-        $role = Role::findOrFail($id);
+        $role = Role::withCount('users')->findOrFail($id);
+
+        if ($role->users_count > 0) {
+            return response()->json([
+                'message' => 'No puedes eliminar este rol porque hay usuarios que lo están utilizando.'
+            ], 422);
+        }
+
         $role->delete();
         return response()->json(['message' => 'Rol eliminado correctamente.']);
     }
