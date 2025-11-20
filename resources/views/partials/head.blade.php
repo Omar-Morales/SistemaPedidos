@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta content="Sistema de Gestión de Pedidos" name="description">
 <meta content="AnderCode" name="author">
-<title>@yield('title', 'AnderCode - Sistema de Compra y Venta')</title>
+<title>@yield('title', 'AnderCode - Sistema de Gestión de Pedidos')</title>
 
 <!-- Icono del sitio -->
 <script>

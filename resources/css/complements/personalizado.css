@@ -1,3 +1,46 @@
+/*estilo de mi theme en vertical el button hover de horizontal*/
+
+[data-layout="vertical"] #horizontal-hover {
+    display: none !important;
+}
+
+[data-layout="vertical"] .page-content .page-content {
+    padding: 0 !important;
+    background: transparent;
+}
+
+[data-layout="vertical"] .page-content .page-content .container-fluid {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+[data-layout="vertical"] .card .card-title {
+    margin-bottom: 1rem !important;
+}
+
+/* Solo si no es layout horizontal */
+
+body:not([data-layout="vertical"]) #close-menu-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1052; /* Más alto que el menu */
+    background: white;
+    border: none;
+    box-shadow: 0 0 5px rgba(0,0,0,0.2);
+    padding: 1px 5px;
+    border-radius: 50%;
+    display: block;
+}
+
+@media (min-width: 768px) {
+    body:not([data-layout="horizontal"]) #close-menu-btn {
+        display: none !important;
+    }
+}
+
+/************separacion de codigo**********/
+
 /* Estilos personalizados para el menú de selección de columnas */
 .dt-button-collection .dt-button {
     background-color: white !important;
@@ -24,19 +67,19 @@
     font-weight: bold;
 }
 
-/*preloader*/
+/*preloader
 
-/* Oculta el navbar hasta que todo esté listo visualmente */
+// Oculta el navbar hasta que todo esté listo visualmente
 #navbar-nav {
     visibility: hidden;
 }
 
-/* Cuando todo cargue, lo muestra */
+// Cuando todo cargue, lo muestra
 html.nav-ready #navbar-nav {
     visibility: visible;
 }
 
-/* Prevenir íconos rotos antes de que Feather o RemixIcons carguen */
+// Prevenir íconos rotos antes de que Feather o RemixIcons carguen
 i[class^="ri-"]::before {
     visibility: hidden;
 }
@@ -44,15 +87,15 @@ html.nav-ready i[class^="ri-"]::before {
     visibility: visible;
 }
 
-/* Contraer menú desplegable automático tipo "More" al inicio */
+// Contraer menú desplegable automático tipo "More" al inicio
 .menu-dropdown.collapse:not(.show) {
     display: none;
 }
 
-/* Centrado vertical solo en el área del contenido principal */
+// Centrado vertical solo en el área del contenido principal
 .content-preloader {
     position: relative;
-    height: 400px; /* Puedes ajustarlo o usar min-height */
+    height: 400px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -73,27 +116,335 @@ html.nav-ready i[class^="ri-"]::before {
         transform: rotate(360deg);
     }
 }
-
-[data-layout="horizontal"] .page-content {
-    margin-top: 0 !important;
-}
+*/
 
 @media (max-width: 1024px) {
     [data-layout="horizontal"] .page-content {
-        padding-top: 35px !important;
+        padding: 30px 0 0 0 !important;
     }
+}
+
+@media (min-width: 1024.1px) {
+  [data-layout="horizontal"] .page-title-box {
+    margin-top: 0 !important;
+  }
 }
 
 
 @media (min-width: 1024.1px) {
-    [data-layout="horizontal"] .container-fluid,
-    [data-layout="horizontal"] .layout-width {
-        max-width: 100% !important;
-        width: 100% !important;
+  [data-layout="horizontal"] .page-content {
+    padding-top: 54px !important; /* menos que antes para no dejar tanto espacio */
+    margin-top: 0 !important; /* o ajusta a 70px si necesitas, pero con cuidado */
+  }
+
+  [data-layout="horizontal"] .container-fluid,
+  [data-layout="horizontal"] .layout-width {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+}
+
+[data-layout="horizontal"] #horizontal-hover,
+[data-layout="horizontal"] #close-menu-btn {
+  display: none !important;
+}
+
+
+/*estilo de los colvis de datatables*/
+/* Estilos para botones activos */
+.dt-button-collection .dt-button.dt-button-active,
+.dt-button-collection .dt-button.active {
+  background-color: #405189 !important; /* Verde */
+  color: white !important;
+  font-weight: bold !important;
+  position: relative !important;
+}
+
+/* Estilos para botones inactivos */
+.dt-button-collection .dt-button:not(.dt-button-active):not(.active) {
+  background-color: #fa7381 !important; /* Rojo */
+  color: white !important;
+  font-weight: bold !important;
+}
+
+/* Checkmark que se añade en JS */
+.dt-button-collection .dt-button .checkmark {
+  color: white;
+  font-weight: bold;
+  margin-right: 6px;
+}
+
+
+/*estilos en mi select2*/
+/* Control cerrado */
+/* ================== Dark Mode ================== */
+html[data-layout-mode="dark"] .select2-container--bootstrap-5 .select2-selection--single {
+  background-color: #2a2c33 !important;
+  color: #eee !important;
+  border: 1px solid #444 !important;
+  box-shadow: none !important;
+  height: 36px !important;
+  padding: 6px 12px !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  line-height: 22px !important; /* para centrar verticalmente */
+  font-family: inherit;
+  display: flex;               /* para alinear verticalmente */
+  align-items: center;         /* centro vertical */
+}
+
+/* Texto seleccionado en dark */
+html[data-layout-mode="dark"] .select2-container--bootstrap-5 .select2-selection__rendered {
+  color: #eee !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  line-height: 22px !important;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+}
+
+/* Dropdown en dark */
+html[data-layout-mode="dark"] .select2-container--bootstrap-5 .select2-dropdown {
+  background-color: #2a2c33 !important;
+  border: 1px solid #444 !important;
+  color: #eee !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Opciones en dark */
+html[data-layout-mode="dark"] .select2-container--bootstrap-5 .select2-results__option {
+  background-color: #2a2c33 !important;
+  color: #eee !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  font-family: inherit;
+  line-height: 22px !important;
+  display: flex;
+  align-items: center;
+}
+
+/* Opción resaltada */
+html[data-layout-mode="dark"] .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] {
+  background-color: #5865f2 !important;
+  color: white !important;
+}
+
+/* Placeholder en dark */
+html[data-layout-mode="dark"] .select2-container--bootstrap-5 .select2-selection__placeholder {
+  color: #bbb !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  font-family: inherit;
+  line-height: 22px !important;
+  display: flex;
+  align-items: center;
+}
+
+/* Campo de búsqueda en dark */
+html[data-layout-mode="dark"] .select2-container--bootstrap-5 .select2-search__field {
+  background-color: #2a2c33 !important;
+  color: #eee !important;
+  border: 1px solid #444 !important;
+  box-shadow: none !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  font-family: inherit;
+}
+
+/* Placeholder del buscador en dark */
+html[data-layout-mode="dark"] .select2-container--bootstrap-5 .select2-search__field::placeholder {
+  color: #bbb !important;
+}
+
+/* Sombra al abrir o foco en dark */
+html[data-layout-mode="dark"] .select2-container--bootstrap-5.select2-container--focus .select2-selection,
+html[data-layout-mode="dark"] .select2-container--bootstrap-5.select2-container--open .select2-selection {
+  border-color: #5865f2 !important;
+  box-shadow: 0 0 0 0.2rem rgba(88, 101, 242, 0.3) !important;
+}
+
+
+/* ================== Light Mode ================== */
+/* Igual estilo que dark pero con colores claros */
+html:not([data-layout-mode="dark"]) .select2-container--bootstrap-5 .select2-selection--single {
+  background-color: #fff !important;
+  color: #212529 !important;
+  border: 1px solid #ced4da !important;
+  box-shadow: none !important;
+  height: 36px !important;
+  padding: 6px 12px !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  line-height: 22px !important;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+}
+
+html:not([data-layout-mode="dark"]) .select2-container--bootstrap-5 .select2-selection__rendered {
+  color: #212529 !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  line-height: 22px !important;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+}
+
+html:not([data-layout-mode="dark"]) .select2-container--bootstrap-5 .select2-dropdown {
+  background-color: #fff !important;
+  border: 1px solid #ced4da !important;
+  color: #212529 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+html:not([data-layout-mode="dark"]) .select2-container--bootstrap-5 .select2-results__option {
+  background-color: #fff !important;
+  color: #212529 !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  font-family: inherit;
+  line-height: 22px !important;
+  display: flex;
+  align-items: center;
+}
+
+html:not([data-layout-mode="dark"]) .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] {
+  background-color: #0d6efd !important;
+  color: white !important;
+}
+
+html:not([data-layout-mode="dark"]) .select2-container--bootstrap-5 .select2-selection__placeholder {
+  color: #6c757d !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  font-family: inherit;
+  line-height: 22px !important;
+  display: flex;
+  align-items: center;
+}
+
+html:not([data-layout-mode="dark"]) .select2-container--bootstrap-5 .select2-search__field {
+  background-color: #fff !important;
+  color: #212529 !important;
+  border: 1px solid #ced4da !important;
+  box-shadow: none !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  font-family: inherit;
+}
+
+html:not([data-layout-mode="dark"]) .select2-container--bootstrap-5 .select2-search__field::placeholder {
+  color: #6c757d !important;
+}
+
+/* Sombra al abrir o foco en light */
+/* Para modo claro */
+html[data-layout-mode="light"] .select2-container--bootstrap-5.select2-container--focus .select2-selection,
+html[data-layout-mode="light"] .select2-container--bootstrap-5.select2-container--open .select2-selection {
+  border-color: rgba(64, 81, 135, 0.25) !important;
+  box-shadow: 0 0 0 0.02rem rgba(64, 81, 135, 0.25) !important;
+}
+
+/* Para modo oscuro */
+html[data-layout-mode="dark"] .select2-container--bootstrap-5.select2-container--focus .select2-selection,
+html[data-layout-mode="dark"] .select2-container--bootstrap-5.select2-container--open .select2-selection {
+  border-color: rgba(64, 81, 135, 0.25) !important;
+  box-shadow: 0 0 0 0.02rem rgba(64, 81, 135, 0.25) !important;
+}
+
+/*estilo de img de table*/
+.custom-thumbnail {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    background-color: transparent;
+}
+
+/*estilo button dropzone */
+.dz-remove {
+  display: inline-block;
+  margin-top: 5px;
+  color: #fff !important;
+  background-color: #dc3545;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  text-decoration: none !important;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.dz-remove:hover {
+  background-color: #c82333;
+  color: #fff !important;
+}
+
+.modal-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1051; /* por encima del contenido del modal */
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.7); /* fondo blanco semitransparente */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-loading-overlay::before {
+    content: "";
+    width: 40px;
+    height: 40px;
+    border: 4px solid #999;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
     }
 }
 
-/* Menú lateral (solo expandido) */
+/* Logo en el menu */
+#page-topbar .navbar-brand-box,
+.app-menu .navbar-brand-box {
+    padding: 10px 0;        /* el mismo valor arriba y abajo */
+}
+
+.summary-card .card-body {
+    padding: 0.9rem 0.9rem 0.4rem !important;
+    min-height: 105px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.summary-card .summary-meta {
+    margin-top: 0.15rem;
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.summary-card .summary-meta .badge {
+    font-size: 0.75rem;
+}
+.summary-card h2 {
+    font-size: 1.4rem;      /* sube/baja a tu gusto */
+    line-height: 1.3;
+}
+
+.summary-card .counter-value {
+    font-weight: 600;        /* opcional */
+}
+
+/* Menú lateral (solo panel expandido) */
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav {
     gap: 6px;
     padding-left: 0;
@@ -121,7 +472,7 @@ body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link i {
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover,
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus {
     color: #1f3a74;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover i,
@@ -132,102 +483,24 @@ body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:foc
 
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active {
     color: #1f3a74;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active i {
     color: #1f3a74;
     font-weight: 500;
-}
-.app-menu .navbar-nav {
-    gap: 6px;
-    padding-left: 0;
-    margin-right: 0;
-}
-
-.app-menu .navbar-nav .nav-link.menu-link {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 12px 18px;
-    color: #5a6178;
-    font-weight: 500;
-    font-size: 0.92rem;
-    transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-.app-menu .navbar-nav .nav-link.menu-link i {
-    transition: color 0.2s ease;
-    color: inherit;
-}
-
-.app-menu .navbar-nav .nav-link.menu-link:hover,
-.app-menu .navbar-nav .nav-link.menu-link:focus {
-    background-color: #314a86;
-    color: #fff;
-    font-weight: 600;
-    font-size: 0.96rem;
-}
-
-.app-menu .navbar-nav .nav-link.menu-link:hover i,
-.app-menu .navbar-nav .nav-link.menu-link:focus i {
-    color: #fff;
-}
-
-.app-menu .navbar-nav .nav-link.menu-link.is-active {
-    background-color: #1f3a74;
-    color: #fff;
-    font-weight: 600;
-    font-size: 0.96rem;
-}
-
-.app-menu .navbar-nav .nav-link.menu-link.is-active i {
-    color: #fff;
-}
-
-/* Override para resaltar solo texto */
-body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link {
-    background: transparent !important;
-    font-size: 0.92rem;
-    font-weight: 500;
-    color: #5a6178;
-}
-
-body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover,
-body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus {
-    background: transparent !important;
-    color: #1f3a74 !important;
-    font-weight: 600;
-    font-size: 0.97rem;
-}
-
-body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover i,
-body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus i {
-    color: #1f3a74 !important;
-}
-
-body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active {
-    background: transparent !important;
-    color: #1f3a74 !important;
-    font-weight: 600;
-    font-size: 0.97rem;
-}
-
-body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active i {
-    color: #1f3a74 !important;
 }
 
 html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover,
 html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus,
 html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active {
-    color: #fff !important;
+    color: #fff;
 }
 
 html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:hover i,
 html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link:focus i,
 html[data-layout-mode="dark"] body:not(.vertical-sidebar-enable) .app-menu .navbar-nav .nav-link.menu-link.is-active i {
-    color: #fff !important;
+    color: #fff;
     font-weight: 500;
 }
 
