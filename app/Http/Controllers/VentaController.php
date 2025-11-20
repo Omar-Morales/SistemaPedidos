@@ -198,7 +198,20 @@ class VentaController extends Controller
         $normalized = str_replace([' ', '-'], '_', $normalized);
         $normalized = preg_replace('/_+/', '_', $normalized ?? '');
 
-        return $normalized ?? '';
+        return in_array($normalized, ['curva', 'milla', 'santa_carolina', 'tienda'], true) ? $normalized : '';
+    }
+
+    private function sanitizeDate(?string $value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('Y-m-d', trim($value))->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function resolveWarehouseValueForUpdate(?string $requestedWarehouse, Venta $venta, ?string $restrictedWarehouse = null): string
@@ -1379,8 +1392,19 @@ class VentaController extends Controller
         return response()->json(['message' => 'Venta anulada correctamente.']);
     }
 
-    public function getData()
+    public function getData(Request $request)
     {
+        $timezone = config('app.timezone');
+        $defaultEndDate = Carbon::now($timezone)->toDateString();
+        $defaultStartDate = Carbon::now($timezone)->subDays(30)->toDateString();
+
+        $startDate = $this->sanitizeDate($request->input('start_date')) ?? $defaultStartDate;
+        $endDate = $this->sanitizeDate($request->input('end_date')) ?? $defaultEndDate;
+
+        if (Carbon::parse($startDate)->greaterThan(Carbon::parse($endDate))) {
+            $endDate = $startDate;
+        }
+
         $detalles = DetalleVenta::query()
             ->select([
                 'detalle_ventas.id as detalle_id',
@@ -1404,12 +1428,19 @@ class VentaController extends Controller
                 'users.name as user_name',
                 'products.name as product_name',
                 'products.status as product_status',
-                DB::raw('(SELECT COUNT(*) FROM detalle_ventas dv2 WHERE dv2.id <= detalle_ventas.id) as row_number'),
+                DB::raw('ROW_NUMBER() OVER (ORDER BY detalle_ventas.id) as row_number'),
             ])
             ->join('ventas', 'ventas.id', '=', 'detalle_ventas.sale_id')
             ->leftJoin('customers', 'customers.id', '=', 'ventas.customer_id')
             ->leftJoin('users', 'users.id', '=', 'ventas.user_id')
             ->leftJoin('products', 'products.id', '=', 'detalle_ventas.product_id');
+
+        $detalles->whereBetween('ventas.sale_date', [$startDate, $endDate]);
+
+        $warehouseFilter = $this->normalizeWarehouseValue($request->input('warehouse'));
+        if ($warehouseFilter && in_array($warehouseFilter, ['curva', 'milla', 'santa_carolina', 'tienda'], true)) {
+            $detalles->whereRaw('LOWER(ventas.warehouse) = ?', [$warehouseFilter]);
+        }
 
         $currentUser = Auth::user();
         $isSupervisor = $currentUser?->hasRole('Supervisor') ?? false;

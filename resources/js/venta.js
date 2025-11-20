@@ -60,13 +60,44 @@ const serverAllowsExtendedPayment = () => (formVenta?.dataset?.canManagePaymentS
 const hasExtendedPaymentPrivileges = () =>
     serverAllowsExtendedPayment() || userRoles.some(role => rolesWithExtendedPaymentPrivileges.has(role));
 const getAvailablePaymentStatuses = () => (hasExtendedPaymentPrivileges() ? adminPaymentStatuses : basePaymentStatuses);
-const canUseDetailEditors = Boolean(detailEditorPanel) && hasExtendedPaymentPrivileges;
+const baseDetailEditorPrivilege = Boolean(detailEditorPanel) && hasExtendedPaymentPrivileges;
+let supervisorTiendaOverride = false;
+let canUseDetailEditors = baseDetailEditorPrivilege;
 let products = [];
 let detalleEditableDT = null;
 let isEditingVenta = false;
 let editingDetailId = null;
 let hiddenDetails = [];
 let forcedWarehousePaymentStatus = null;
+
+const normalizeWarehouseForUi = (value) => (value ?? '').toString().trim().toLowerCase();
+
+const isSupervisorLimited = () => isSupervisorRole;
+
+function updateDetailEditorAccess(currentWarehouseValue = '') {
+    const normalized = normalizeWarehouseForUi(currentWarehouseValue);
+    supervisorTiendaOverride = isSupervisorRole && normalized === 'tienda';
+    if (isSupervisorLimited()) {
+        canUseDetailEditors = supervisorTiendaOverride;
+    } else {
+        canUseDetailEditors = baseDetailEditorPrivilege || supervisorTiendaOverride;
+    }
+    refreshDetailEditorPanelVisibility();
+}
+
+function refreshDetailEditorPanelVisibility() {
+    if (!detailEditorPanel) return;
+    const shouldShow = canUseDetailEditors && isEditingVenta;
+    detailEditorPanel.classList.toggle('d-none', !shouldShow);
+    if (detailOrderStatusSelect) {
+        detailOrderStatusSelect.disabled = !canUseDetailEditors;
+    }
+    if (detailAmountPaidInput) {
+        detailAmountPaidInput.disabled = !canUseDetailEditors;
+    }
+}
+
+updateDetailEditorAccess(restrictedWarehouse || '');
 
 function formatWarehouseAmount(value) {
     if (!Number.isFinite(value) || value <= 0) {
@@ -1492,6 +1523,7 @@ $(document).on('click', '.edit-btn', async function () {
     forcedWarehousePaymentStatus = null;
     isEditingVenta = true;
     editingDetailId = typeof targetDetail !== 'undefined' ? String(targetDetail) : null;
+    refreshDetailEditorPanelVisibility();
     hiddenDetails = [];
     if (btnAgregarProducto) {
         btnAgregarProducto.disabled = true;
@@ -1505,6 +1537,9 @@ $(document).on('click', '.edit-btn', async function () {
         const { data } = await axios.get(`/ventas/${id}`);
         const venta = data.venta;
         const clientes = data.clientes;
+        updateDetailEditorAccess(
+            (venta.detalle && venta.detalle[0]?.warehouse) || venta.warehouse || ''
+        );
 
         // Cargar productos relevantes de la venta
         const productosEnVenta = (venta.detalle || []).map(item => item.product_id);
@@ -1574,6 +1609,7 @@ $(document).on('click', '.edit-btn', async function () {
         // Llenar tabla de detalle
         tablaDetalle.innerHTML = '';
         inicializarDataTableEditable();
+        refreshDetailEditorPanelVisibility();
 
         let selectedDetailStatus = venta.payment_status ?? 'pending';
         let currentDetailOrderStatus = null;

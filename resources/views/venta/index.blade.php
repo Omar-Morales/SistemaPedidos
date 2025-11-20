@@ -40,6 +40,38 @@
                                 </button>
                             @endcan
 
+                            @php
+                                $defaultFilterStart = now(config('app.timezone'))->subDays(30)->format('Y-m-d');
+                                $defaultFilterEnd = now(config('app.timezone'))->format('Y-m-d');
+                            @endphp
+                            <div class="row g-3 align-items-end mb-3" id="ventasFilters">
+                                <div class="col-md-3">
+                                    <label for="filterStartDate" class="form-label">Desde</label>
+                                    <input type="date" class="form-control" id="filterStartDate"
+                                        data-default="{{ $defaultFilterStart }}" value="{{ $defaultFilterStart }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="filterEndDate" class="form-label">Hasta</label>
+                                    <input type="date" class="form-control" id="filterEndDate"
+                                        data-default="{{ $defaultFilterEnd }}" value="{{ $defaultFilterEnd }}">
+                                </div>
+                                <div class="col-md-3 {{ $isWarehouseRole ? 'd-none' : '' }}">
+                                    <label for="filterWarehouse" class="form-label">Almacén</label>
+                                    <select class="form-select" id="filterWarehouse" data-default="">
+                                        <option value="">Todos</option>
+                                        <option value="curva">Curva</option>
+                                        <option value="milla">Milla</option>
+                                        <option value="santa_carolina">Santa Carolina</option>
+                                        <option value="tienda">Tienda</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3 d-flex gap-2">
+                                    <button type="button" class="btn btn-secondary mt-auto w-100" id="btnResetFilters">
+                                        Limpiar filtros
+                                    </button>
+                                </div>
+                            </div>
+
                             <div class="table-responsive">
                                 <table id="ventasTable"
                                     class="table table-bordered dt-responsive nowrap table-striped align-middle"
@@ -206,10 +238,10 @@
                             <input type="hidden" id="amount_paid" name="amount_paid" value="0.00">
                         @endif
 
-                        @if ($canManagePaymentStatuses && !$isWarehouseRole)
-                            <div class="row g-3 mb-3 d-none" id="detailEditorPanel">
-                                <div class="col-md-6">
-                                    <label for="detail_order_status" class="form-label">Estado de Pedido</label>
+                            @if (($canManagePaymentStatuses || $isSupervisorRole) && !$isWarehouseRole)
+                                <div class="row g-3 mb-3 d-none" id="detailEditorPanel">
+                                    <div class="col-md-6">
+                                        <label for="detail_order_status" class="form-label">Estado de Pedido</label>
                                     <select class="form-select" id="detail_order_status">
                                         <option value="pending">Pendiente</option>
                                         <option value="in_progress">En curso</option>
