@@ -8,13 +8,52 @@ const warehouseRoles = ['curva', 'milla', 'santa carolina'];
 const IS_WAREHOUSE_ROLE = warehouseRoles.some(role => userRoles.includes(role));
 
 const LOCATION_OPTIONS = [
-    'Cdra 7',
-    'Cdra 8',
-    'Cdra 9',
-    'Cdra 10',
-    'Cdra 11',
-    'Cdra 12',
-    'Cdra 13'
+    'ATE',
+    'AYACUCHO',
+    'BARRANCA',
+    'CAJAMARCA',
+    'CAÑETE',
+    'CARABAYLLO',
+    'CARAZ',
+    'CHAMCHAMAYO',
+    'CHANCAY',
+    'CHICLAYO',
+    'CHIMBOTE',
+    'COMAS',
+    'CONSTRUCENTER',
+    'CUADRA 10',
+    'CUADRA 11',
+    'CUADRA 6',
+    'CUADRA 7',
+    'CUADRA 8',
+    'CUADRA 9',
+    'FRENTE',
+    'GALERIA 1019',
+    'GALERIA 1069',
+    'GALERIA 907',
+    'GALERIA 931',
+    'GALERIA 955 ZOTANO',
+    'HUACHIPA',
+    'HUANCAYO',
+    'HUANUCO',
+    'HUARAL',
+    'HUARAZ',
+    'HUAROCHIRI',
+    'HUAYCAN',
+    'LAMBAYEQUE',
+    'PIURA',
+    'PTE. PIEDRA',
+    'SAN JUAN DE LURIGANCHO',
+    'SAN JUAN DE MIRAFLORES',
+    'STA. CAROLINA',
+    'STA. CLORINDA',
+    'STA. INES',
+    'STA. MERCEDEZ',
+    'SURQUILLO',
+    'TRUJILLO',
+    'TUMBES',
+    'VILLA EL SALVADOR',
+    'SIN UBICACIÓN',
 ];
 
 const modalElement = document.getElementById('modalTienda');
@@ -218,7 +257,5 @@ document.getElementById('phone')?.addEventListener('input', function () {
 });
 
 populateLocations();
-
-
 
 

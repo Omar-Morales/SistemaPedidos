@@ -40,19 +40,24 @@ class CategoryController extends Controller
             'description' => 'nullable|string',
         ]);
 
+        $description = $request->filled('description')
+            ? $request->description
+            : 'CALIDAD 100% GARANTIZADA';
+
         $existing = Category::where('name', $request->name)->first();
 
         if ($existing && $existing->status === 'inactive') {
-            if ($request->filled('description')) {
-                $existing->description = $request->description;
-            }
+            $existing->description = $description;
             $existing->status = 'active';
             $existing->save();
 
             return response()->json(['message' => 'Categoría reactivada correctamente.']);
         }
 
-        Category::create($request->only(['name', 'description']));
+        Category::create([
+            'name' => $request->name,
+            'description' => $description,
+        ]);
 
         return response()->json(['message' => 'Categoría creada correctamente.']);
     }
@@ -79,7 +84,14 @@ class CategoryController extends Controller
         ]);
 
         $categoria = Category::findOrFail($id);
-        $categoria->update($request->only(['name', 'description']));
+        $description = $request->filled('description')
+            ? $request->description
+            : 'CALIDAD 100% GARANTIZADA';
+
+        $categoria->update([
+            'name' => $request->name,
+            'description' => $description,
+        ]);
 
         return response()->json(['message' => 'Categoría actualizada correctamente.']);
     }
