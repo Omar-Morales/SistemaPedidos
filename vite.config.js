@@ -18,7 +18,6 @@ export default defineConfig({
                 'resources/js/venta.js',
                 'resources/js/inventorie.js',
                 'resources/js/rol.js',
-                'resources/js/backup.js',
             ],
             refresh: true,
         }),
