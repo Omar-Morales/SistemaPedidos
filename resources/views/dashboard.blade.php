@@ -655,6 +655,37 @@
                 </div>
             </div>
 
+            <div class="row">
+                <div class="col-xl-8">
+                    <div class="card card-animate h-100">
+                        <div class="card-header d-flex align-items-center justify-content-between">
+                            <h4 class="card-title mb-0 flex-grow-1">Proyección de Ingresos (30 días)</h4>
+                            <span class="badge bg-soft-info text-info">Forecast</span>
+                        </div>
+                        <div class="card-body">
+                            <div id="revenuePredictionChart" class="apex-charts" style="min-height: 350px;"></div>
+                            <div id="revenuePredictionEmpty" class="text-center text-muted py-5 d-none">
+                                No hay predicciones disponibles.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-4">
+                    <div class="card card-animate h-100">
+                        <div class="card-header d-flex align-items-center justify-content-between">
+                            <h4 class="card-title mb-0 flex-grow-1">Top Productos Pronosticados</h4>
+                            <span class="badge bg-soft-success text-success">Top 10</span>
+                        </div>
+                        <div class="card-body">
+                            <div id="topPredictedProductsChart" class="apex-charts" style="min-height: 350px;"></div>
+                            <div id="topPredictedProductsEmpty" class="text-center text-muted py-5 d-none">
+                                No hay datos de productos pronosticados.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
     </div>

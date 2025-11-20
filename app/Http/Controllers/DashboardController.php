@@ -261,4 +261,42 @@ class DashboardController extends Controller
             })
             ->values();
     }
+
+    public function getRevenuePredictions()
+    {
+        $predictions = DB::table('predicciones_ingresos')
+            ->orderBy('fecha')
+            ->get();
+
+        if ($predictions->isEmpty()) {
+            return response()->json([
+                'labels' => [],
+                'values' => [],
+                'lower' => [],
+                'upper' => [],
+            ]);
+        }
+
+        return response()->json([
+            'labels' => $predictions->pluck('fecha')->map(fn ($f) => Carbon::parse($f)->format('Y-m-d')),
+            'values' => $predictions->pluck('ingreso_predicho')->map(fn ($v) => (float) $v),
+            'lower' => $predictions->pluck('ingreso_predicho_min')->map(fn ($v) => (float) $v),
+            'upper' => $predictions->pluck('ingreso_predicho_max')->map(fn ($v) => (float) $v),
+        ]);
+    }
+
+    public function getProductPredictions()
+    {
+        $topProducts = DB::table('predicciones_productos')
+            ->select('producto', DB::raw('SUM(cantidad_predicha) as total'))
+            ->groupBy('producto')
+            ->orderByDesc('total')
+            ->limit(10)
+            ->get();
+
+        return response()->json([
+            'labels' => $topProducts->pluck('producto'),
+            'values' => $topProducts->pluck('total')->map(fn ($v) => (float) $v),
+        ]);
+    }
 }

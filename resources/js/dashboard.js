@@ -183,6 +183,9 @@ document.addEventListener('DOMContentLoaded', function () {
         .catch(error => {
             console.error("Error al cargar dashboard:", error);
         });
+
+    loadRevenuePredictions();
+    loadTopPredictedProducts();
 });
 
 function renderResumenChart(chartInstance, ventas, compras, range, timeline = [], fallbackMonths = []) {
@@ -877,6 +880,120 @@ function formatVelzonNumber(value) {
 function formatPercentage(value) {
     const parsed = Number(value || 0);
     return `${parsed.toFixed(1)}%`;
+}
+
+function loadRevenuePredictions() {
+    const chartEl = document.getElementById('revenuePredictionChart');
+    const emptyEl = document.getElementById('revenuePredictionEmpty');
+    if (!chartEl) return;
+
+    axios.get('/dashboard/predicciones/ingresos')
+        .then(({ data }) => {
+            if (!data || !(data.labels || []).length) {
+                if (chartEl) chartEl.classList.add('d-none');
+                if (emptyEl) emptyEl.classList.remove('d-none');
+                return;
+            }
+            const chart = new ApexCharts(chartEl, buildRevenuePredictionOptions(data));
+            chart.render();
+        })
+        .catch(() => {
+            if (chartEl) chartEl.classList.add('d-none');
+            if (emptyEl) emptyEl.classList.remove('d-none');
+        });
+}
+
+function buildRevenuePredictionOptions(dataset = {}) {
+    const labels = dataset.labels ?? [];
+    const values = dataset.values ?? [];
+    const lower = dataset.lower ?? [];
+    const upper = dataset.upper ?? [];
+
+    return {
+        chart: { type: 'line', height: 360, toolbar: { show: false } },
+        stroke: { width: [3, 2, 2], dashArray: [0, 6, 6] },
+        colors: ['#405189', '#0AB39C', '#F06548'],
+        series: [
+            { name: 'Ingreso Predicho', data: values },
+            { name: 'Límite Superior', data: upper },
+            { name: 'Límite Inferior', data: lower },
+        ],
+        xaxis: {
+            categories: labels,
+            type: 'datetime',
+            labels: { rotate: -45 },
+        },
+        yaxis: {
+            labels: { formatter: (val) => formatCompactCurrency(val) },
+        },
+        tooltip: {
+            shared: true,
+            y: { formatter: (val) => formatCurrency(val) },
+        },
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shadeIntensity: 1,
+                opacityFrom: 0.4,
+                opacityTo: 0,
+                stops: [0, 90, 100],
+            },
+        },
+        dataLabels: { enabled: false },
+        legend: { position: 'top' },
+    };
+}
+
+function loadTopPredictedProducts() {
+    const chartEl = document.getElementById('topPredictedProductsChart');
+    const emptyEl = document.getElementById('topPredictedProductsEmpty');
+    if (!chartEl) return;
+
+    axios.get('/dashboard/predicciones/productos')
+        .then(({ data }) => {
+            if (!data || !(data.labels || []).length) {
+                if (chartEl) chartEl.classList.add('d-none');
+                if (emptyEl) emptyEl.classList.remove('d-none');
+                return;
+            }
+
+            const chart = new ApexCharts(chartEl, buildTopPredictedProductsOptions(data));
+            chart.render();
+        })
+        .catch(() => {
+            if (chartEl) chartEl.classList.add('d-none');
+            if (emptyEl) emptyEl.classList.remove('d-none');
+        });
+}
+
+function buildTopPredictedProductsOptions(dataset = {}) {
+    const labels = dataset.labels ?? [];
+    const values = dataset.values ?? [];
+
+    return {
+        chart: { type: 'bar', height: 360, toolbar: { show: false } },
+        colors: ['#0AB39C'],
+        plotOptions: {
+            bar: {
+                horizontal: true,
+                dataLabels: { position: 'top' },
+            },
+        },
+        dataLabels: {
+            enabled: true,
+            formatter: (val) => `${Number(val || 0).toFixed(0)} uds`,
+            offsetX: 10,
+        },
+        series: [{ name: 'Cantidad Predicha', data: values }],
+        xaxis: {
+            categories: labels,
+            labels: { formatter: (val) => Number(val || 0).toFixed(0) },
+        },
+        tooltip: {
+            y: { formatter: (val) => `${Number(val || 0).toFixed(0)} unidades` },
+        },
+        grid: { borderColor: '#f1f1f1' },
+    };
 }
 
 function aggregateOrdersSummary(summary = {}) {
