@@ -15,6 +15,9 @@ logging.basicConfig(
 
 # Lee frecuencia desde env (por ejemplo, cada 24 horas)
 PRED_INTERVAL_HOURS = int(os.getenv("PRED_INTERVAL_HOURS", "24"))
+PRED_SCHEDULER_TRIGGER = os.getenv("PRED_SCHEDULER_TRIGGER", "interval")  # interval | cron
+PRED_CRON_HOUR = int(os.getenv("PRED_CRON_HOUR", "0"))
+PRED_CRON_MINUTE = int(os.getenv("PRED_CRON_MINUTE", "0"))
 
 scheduler = BackgroundScheduler()
 
@@ -38,14 +41,25 @@ def start_scheduler():
     if scheduler.running:
         return
 
-    logging.info("Iniciando APScheduler con intervalo de %s horas", PRED_INTERVAL_HOURS)
-    scheduler.add_job(
-        func=job_predicciones,
-        trigger="interval",
-        hours=PRED_INTERVAL_HOURS,
-        id="predicciones_job",
-        replace_existing=True,
-    )
+    if PRED_SCHEDULER_TRIGGER == "cron":
+        logging.info("Iniciando APScheduler con trigger CRON a las %02d:%02d", PRED_CRON_HOUR, PRED_CRON_MINUTE)
+        scheduler.add_job(
+            func=job_predicciones,
+            trigger="cron",
+            hour=PRED_CRON_HOUR,
+            minute=PRED_CRON_MINUTE,
+            id="predicciones_job",
+            replace_existing=True,
+        )
+    else:
+        logging.info("Iniciando APScheduler con intervalo de %s horas", PRED_INTERVAL_HOURS)
+        scheduler.add_job(
+            func=job_predicciones,
+            trigger="interval",
+            hours=PRED_INTERVAL_HOURS,
+            id="predicciones_job",
+            replace_existing=True,
+        )
     scheduler.start()
     atexit.register(lambda: scheduler.shutdown())
 

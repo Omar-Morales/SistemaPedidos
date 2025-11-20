@@ -186,6 +186,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     loadRevenuePredictions();
     loadTopPredictedProducts();
+    loadRevenueEvaluation();
 });
 
 function renderResumenChart(chartInstance, ventas, compras, range, timeline = [], fallbackMonths = []) {
@@ -993,6 +994,62 @@ function buildTopPredictedProductsOptions(dataset = {}) {
             y: { formatter: (val) => `${Number(val || 0).toFixed(0)} unidades` },
         },
         grid: { borderColor: '#f1f1f1' },
+    };
+}
+
+function loadRevenueEvaluation() {
+    const chartEl = document.getElementById('revenueEvaluationChart');
+    const emptyEl = document.getElementById('revenueEvaluationEmpty');
+    if (!chartEl) return;
+
+    axios.get('/dashboard/predicciones/evaluacion')
+        .then(({ data }) => {
+            const labels = data.labels ?? [];
+            if (!labels.length) {
+                chartEl.classList.add('d-none');
+                if (emptyEl) emptyEl.classList.remove('d-none');
+                return;
+            }
+            updateText('evalMae', formatCompactCurrency(data.mae ?? 0));
+            updateText('evalRmse', formatCompactCurrency(data.rmse ?? 0));
+            updateText('evalMape', `${Number(data.mape || 0).toFixed(2)}%`);
+
+            const chart = new ApexCharts(chartEl, buildRevenueEvaluationOptions(data));
+            chart.render();
+        })
+        .catch(() => {
+            if (chartEl) chartEl.classList.add('d-none');
+            if (emptyEl) emptyEl.classList.remove('d-none');
+        });
+}
+
+function buildRevenueEvaluationOptions(dataset = {}) {
+    const labels = dataset.labels ?? [];
+    const real = dataset.real ?? [];
+    const predicted = dataset.predicted ?? [];
+
+    return {
+        chart: { type: 'line', height: 360, toolbar: { show: false } },
+        stroke: { width: 3 },
+        colors: ['#0AB39C', '#405189'],
+        series: [
+            { name: 'Ingreso Real', data: real },
+            { name: 'Ingreso Predicho', data: predicted },
+        ],
+        xaxis: {
+            categories: labels,
+            type: 'datetime',
+            labels: { rotate: -45 },
+        },
+        yaxis: {
+            labels: { formatter: (val) => formatCompactCurrency(val) },
+        },
+        tooltip: {
+            shared: true,
+            y: { formatter: (val) => formatCurrency(val) },
+        },
+        legend: { position: 'top', horizontalAlign: 'right' },
+        dataLabels: { enabled: false },
     };
 }
 

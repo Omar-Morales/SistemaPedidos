@@ -22,7 +22,7 @@ import pandas as pd
 from prophet import Prophet
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 from dotenv import load_dotenv
@@ -43,6 +43,7 @@ PRED_REVENUE_TABLE = os.getenv("PRED_REVENUE_TABLE", "predicciones_ingresos")
 PRED_PRODUCTS_TABLE = os.getenv("PRED_PRODUCTS_TABLE", "predicciones_productos")
 TOP_PRODUCTS_TABLE = os.getenv("TOP_PRODUCTS_TABLE", "top_productos_predichos")
 FUTURE_DAYS = int(os.getenv("FORECAST_DAYS", "30"))
+EVAL_REVENUE_TABLE = os.getenv("EVAL_REVENUE_TABLE", "evaluacion_predicciones_ingresos")
 
 
 def get_engine() -> Engine:
@@ -105,6 +106,87 @@ def load_sales_data(engine: Engine) -> pd.DataFrame:
         raise ValueError("No hay datos válidos para entrenar los modelos.")
 
     return df
+
+
+def evaluate_revenue_predictions(engine: Engine) -> dict:
+    """
+    Compara los ingresos reales contra las predicciones existentes
+    y guarda el error por fecha. Devuelve métricas agregadas (MAE, RMSE, MAPE)
+    para lo recién evaluado.
+    """
+    inspector = inspect(engine)
+    if not inspector.has_table(PRED_REVENUE_TABLE):
+        logging.info("No existe la tabla de predicciones (%s); se omite evaluación.", PRED_REVENUE_TABLE)
+        return {}
+
+    try:
+        actuals = pd.read_sql(
+            """
+            SELECT
+                DATE(sale_date) AS fecha,
+                SUM(total_price) AS ingreso_real
+            FROM ventas
+            WHERE sale_date IS NOT NULL
+              AND (status IS NULL OR status != 'cancelled')
+            GROUP BY 1
+            """,
+            engine,
+            parse_dates=["fecha"],
+        )
+    except Exception as exc:
+        logging.warning("No se pudieron obtener ventas reales para evaluación: %s", exc)
+        return {}
+
+    if actuals.empty:
+        logging.info("No hay ventas reales para evaluar predicciones.")
+        return {}
+
+    preds = pd.read_sql(
+        f"SELECT fecha, ingreso_predicho FROM {PRED_REVENUE_TABLE}",
+        engine,
+        parse_dates=["fecha"],
+    )
+
+    merged = actuals.merge(preds, on="fecha", how="inner")
+    if merged.empty:
+        logging.info("No hay coincidencias entre predicciones y valores reales para evaluar.")
+        return {}
+
+    if inspector.has_table(EVAL_REVENUE_TABLE):
+        existentes = pd.read_sql(
+            f"SELECT fecha FROM {EVAL_REVENUE_TABLE}",
+            engine,
+            parse_dates=["fecha"],
+        )
+        if not existentes.empty:
+            merged = merged[~merged["fecha"].isin(existentes["fecha"])]
+
+    if merged.empty:
+        logging.info("Todas las fechas reales ya fueron evaluadas previamente.")
+        return {}
+
+    merged["error"] = merged["ingreso_real"] - merged["ingreso_predicho"]
+    merged["error_absoluto"] = merged["error"].abs()
+    merged["error_cuadratico"] = merged["error"] ** 2
+    merged["error_porcentual"] = merged.apply(
+        lambda row: (row["error_absoluto"] / row["ingreso_real"]) * 100 if row["ingreso_real"] else None,
+        axis=1,
+    )
+
+    df_evaluacion = merged[["fecha", "ingreso_predicho", "ingreso_real", "error_absoluto", "error_cuadratico", "error_porcentual"]]
+    df_evaluacion["fecha"] = df_evaluacion["fecha"].dt.date
+    df_evaluacion.to_sql(EVAL_REVENUE_TABLE, engine, if_exists="append", index=False)
+    logging.info("Evaluación guardada para %d fechas en %s.", len(df_evaluacion), EVAL_REVENUE_TABLE)
+
+    mae = df_evaluacion["error_absoluto"].mean()
+    rmse = np.sqrt(df_evaluacion["error_cuadratico"].mean())
+    mape = df_evaluacion["error_porcentual"].dropna().mean()
+    return {
+        "evaluaciones_registradas": len(df_evaluacion),
+        "mae": mae,
+        "rmse": rmse,
+        "mape": mape,
+    }
 
 
 def train_and_forecast_revenue(df_ventas: pd.DataFrame, dias_a_predecir: int = FUTURE_DAYS) -> pd.DataFrame:
@@ -282,6 +364,7 @@ def run_all_predictions(future_days: int | None = None, top_n: int | None = None
     top_n = top_n or int(os.getenv("TOP_PRODUCTOS", "10"))
 
     engine = get_engine()
+    evaluacion = evaluate_revenue_predictions(engine)
     df_ventas = load_sales_data(engine)
 
     # Modelo 1: ingresos
@@ -294,10 +377,13 @@ def run_all_predictions(future_days: int | None = None, top_n: int | None = None
     save_product_predictions(engine, df_pred_products, df_top_products)
 
     # Pequeño resumen para la API
-    return {
+    resumen = {
         "dias_a_predecir": dias_a_predecir,
         "top_n": top_n,
         "registros_pred_ingresos": len(df_pred_revenue),
         "registros_pred_productos": len(df_pred_products),
         "registros_top_productos": len(df_top_products),
     }
+    if evaluacion:
+        resumen["evaluacion_ingresos"] = evaluacion
+    return resumen

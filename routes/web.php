@@ -77,6 +77,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard/data', [DashboardController::class, 'getDashboardData'])->name('dashboard.data');
     Route::get('/dashboard/predicciones/ingresos', [DashboardController::class, 'getRevenuePredictions'])->name('dashboard.predictions.revenue');
     Route::get('/dashboard/predicciones/productos', [DashboardController::class, 'getProductPredictions'])->name('dashboard.predictions.products');
+    Route::get('/dashboard/predicciones/evaluacion', [DashboardController::class, 'getRevenueEvaluation'])->name('dashboard.predictions.evaluation');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
 });

@@ -12,7 +12,7 @@
 
 
 
-            <div class="row">
+            <div class="row g-4">
 
                 <div class="col-12">
 
@@ -50,7 +50,7 @@
 
                     <div class="card card-animate summary-card">
 
-                        <div class="card-body">
+                        <div class="card-body pt-0">
 
                             <div class="d-flex justify-content-between align-items-start">
 
@@ -655,7 +655,7 @@
                 </div>
             </div>
 
-            <div class="row">
+            <div class="row g-4">
                 <div class="col-xl-8">
                     <div class="card card-animate h-100">
                         <div class="card-header d-flex align-items-center justify-content-between">
@@ -680,6 +680,33 @@
                             <div id="topPredictedProductsChart" class="apex-charts" style="min-height: 350px;"></div>
                             <div id="topPredictedProductsEmpty" class="text-center text-muted py-5 d-none">
                                 No hay datos de productos pronosticados.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-12">
+                    <div class="card card-animate mt-4">
+                        <div class="card-header flex-wrap d-flex align-items-center justify-content-between gap-2">
+                            <h4 class="card-title mb-0 flex-grow-1">Evaluación de Predicciones vs. Reales</h4>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="badge bg-soft-primary text-primary">
+                                    MAE: <span id="evalMae">0</span>
+                                </span>
+                                <span class="badge bg-soft-warning text-warning">
+                                    RMSE: <span id="evalRmse">0</span>
+                                </span>
+                                <span class="badge bg-soft-success text-success">
+                                    MAPE: <span id="evalMape">0%</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="revenueEvaluationChart" class="apex-charts" style="min-height: 360px;"></div>
+                            <div id="revenueEvaluationEmpty" class="text-center text-muted py-5 d-none">
+                                Aún no hay datos evaluados. Ejecuta las predicciones después de registrar los valores reales.
                             </div>
                         </div>
                     </div>

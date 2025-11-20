@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Models\DetalleVenta;
 use App\Models\DetalleCompra;
+use Throwable;
 
 class DashboardController extends Controller
 {
@@ -297,6 +298,62 @@ class DashboardController extends Controller
         return response()->json([
             'labels' => $topProducts->pluck('producto'),
             'values' => $topProducts->pluck('total')->map(fn ($v) => (float) $v),
+        ]);
+    }
+
+    public function getRevenueEvaluation()
+    {
+        try {
+            $rows = DB::table('evaluacion_predicciones_ingresos')
+                ->orderBy('fecha')
+                ->get();
+        } catch (Throwable $e) {
+            return response()->json([
+                'labels' => [],
+                'real' => [],
+                'predicted' => [],
+                'mae' => 0,
+                'rmse' => 0,
+                'mape' => 0,
+            ]);
+        }
+
+        if ($rows->isEmpty()) {
+            return response()->json([
+                'labels' => [],
+                'real' => [],
+                'predicted' => [],
+                'mae' => 0,
+                'rmse' => 0,
+                'mape' => 0,
+            ]);
+        }
+
+        $labels = $rows->pluck('fecha')->map(fn ($f) => Carbon::parse($f)->format('Y-m-d'));
+        $real = $rows->pluck('ingreso_real')->map(fn ($v) => (float) $v);
+        $pred = $rows->pluck('ingreso_predicho')->map(fn ($v) => (float) $v);
+        $mae = $rows->avg(function ($row) {
+            return abs(($row->ingreso_real ?? 0) - ($row->ingreso_predicho ?? 0));
+        });
+        $rmse = sqrt($rows->avg(function ($row) {
+            $error = ($row->ingreso_real ?? 0) - ($row->ingreso_predicho ?? 0);
+            return $error ** 2;
+        }));
+        $validMape = $rows->filter(fn ($row) => ($row->ingreso_real ?? 0) != 0);
+        $mape = $validMape->isEmpty()
+            ? 0
+            : $validMape->avg(function ($row) {
+                $error = abs(($row->ingreso_real ?? 0) - ($row->ingreso_predicho ?? 0));
+                return ($error / max($row->ingreso_real, 1)) * 100;
+            });
+
+        return response()->json([
+            'labels' => $labels,
+            'real' => $real,
+            'predicted' => $pred,
+            'mae' => round($mae ?? 0, 2),
+            'rmse' => round($rmse ?? 0, 2),
+            'mape' => round($mape ?? 0, 2),
         ]);
     }
 }
