@@ -265,29 +265,53 @@ class DashboardController extends Controller
 
     public function getRevenuePredictions()
     {
-        $predictions = DB::table('predicciones_ingresos')
+        $lastSaleDate = DB::table('ventas')->max('sale_date');
+        $allPredictions = DB::table('predicciones_ingresos')
             ->orderBy('fecha')
             ->get();
 
-        if ($predictions->isEmpty()) {
+        $filtered = $allPredictions;
+        if ($lastSaleDate) {
+            $filtered = $allPredictions->filter(function ($row) use ($lastSaleDate) {
+                return Carbon::parse($row->fecha)->gt(Carbon::parse($lastSaleDate));
+            })->values();
+        }
+
+        if ($filtered->isEmpty() && $allPredictions->isEmpty()) {
             return response()->json([
                 'labels' => [],
                 'values' => [],
                 'lower' => [],
                 'upper' => [],
+                'full_labels' => [],
+                'full_values' => [],
+                'full_lower' => [],
+                'full_upper' => [],
             ]);
         }
 
+        if ($filtered->isEmpty()) {
+            $filtered = $allPredictions;
+        }
+
         return response()->json([
-            'labels' => $predictions->pluck('fecha')->map(fn ($f) => Carbon::parse($f)->format('Y-m-d')),
-            'values' => $predictions->pluck('ingreso_predicho')->map(fn ($v) => (float) $v),
-            'lower' => $predictions->pluck('ingreso_predicho_min')->map(fn ($v) => (float) $v),
-            'upper' => $predictions->pluck('ingreso_predicho_max')->map(fn ($v) => (float) $v),
+            'labels' => $filtered->pluck('fecha')->map(fn ($f) => Carbon::parse($f)->format('Y-m-d')),
+            'values' => $filtered->pluck('ingreso_predicho')->map(fn ($v) => (float) $v),
+            'lower' => $filtered->pluck('ingreso_predicho_min')->map(fn ($v) => (float) $v),
+            'upper' => $filtered->pluck('ingreso_predicho_max')->map(fn ($v) => (float) $v),
+            'full_labels' => $allPredictions->pluck('fecha')->map(fn ($f) => Carbon::parse($f)->format('Y-m-d')),
+            'full_values' => $allPredictions->pluck('ingreso_predicho')->map(fn ($v) => (float) $v),
+            'full_lower' => $allPredictions->pluck('ingreso_predicho_min')->map(fn ($v) => (float) $v),
+            'full_upper' => $allPredictions->pluck('ingreso_predicho_max')->map(fn ($v) => (float) $v),
         ]);
     }
 
     public function getProductPredictions()
     {
+        $range = DB::table('predicciones_productos')
+            ->selectRaw('MIN(fecha) as min_fecha, MAX(fecha) as max_fecha')
+            ->first();
+
         $topProducts = DB::table('predicciones_productos')
             ->select('producto', DB::raw('SUM(cantidad_predicha) as total'))
             ->groupBy('producto')
@@ -298,6 +322,8 @@ class DashboardController extends Controller
         return response()->json([
             'labels' => $topProducts->pluck('producto'),
             'values' => $topProducts->pluck('total')->map(fn ($v) => (float) $v),
+            'start_date' => $range?->min_fecha ? Carbon::parse($range->min_fecha)->format('Y-m-d') : null,
+            'end_date' => $range?->max_fecha ? Carbon::parse($range->max_fecha)->format('Y-m-d') : null,
         ]);
     }
 

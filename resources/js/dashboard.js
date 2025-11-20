@@ -2,6 +2,32 @@
 
 axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]').content;
 
+const REVENUE_PREDICTION_RANGES = {
+    '7d': { label: 'Próximos 7 días', limit: 7 },
+    '15d': { label: 'Próximos 15 días', limit: 15 },
+    '30d': { label: 'Próximos 30 días', limit: 30 },
+    all: { label: 'Todo el horizonte', limit: null },
+};
+
+const REVENUE_EVALUATION_RANGES = {
+    '7d': { label: 'Últimos 7 días', limit: 7 },
+    '15d': { label: 'Últimos 15 días', limit: 15 },
+    '30d': { label: 'Últimos 30 días', limit: 30 },
+    '60d': { label: 'Últimos 60 días', limit: 60 },
+    '90d': { label: 'Últimos 90 días', limit: 90 },
+    all: { label: 'Todo el histórico', limit: null },
+};
+
+let revenuePredictionData = null;
+let revenuePredictionChart = null;
+let activeRevenuePredictionRange = '30d';
+let revenuePredictionRangeBound = false;
+
+let revenueEvaluationData = null;
+let revenueEvaluationChart = null;
+let activeRevenueEvaluationRange = '30d';
+let revenueEvaluationRangeBound = false;
+
 document.addEventListener('DOMContentLoaded', function () {
     axios.get(`/dashboard/data`)
         .then(({ data }) => {
@@ -878,6 +904,163 @@ function formatVelzonNumber(value) {
     return parsed.toLocaleString('es-PE');
 }
 
+function formatPredictionRange(startDate, endDate) {
+    if (!startDate || !endDate) return '';
+    const options = { day: '2-digit', month: 'short', year: 'numeric' };
+    const start = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return '';
+    }
+
+    const formatter = new Intl.DateTimeFormat('es-PE', options);
+    const startLabel = formatter.format(start);
+    const endLabel = formatter.format(end);
+    if (startLabel === endLabel) {
+        return `para ${startLabel}`;
+    }
+    return `del ${startLabel} al ${endLabel}`;
+}
+
+function updateRangeDropdownLabel(elementId, text) {
+    const el = document.getElementById(elementId);
+    if (el) {
+        el.textContent = text;
+    }
+}
+
+function setActiveRangeItems(selector, activeRange) {
+    document.querySelectorAll(selector).forEach((item) => {
+        if (item.getAttribute('data-range') === activeRange) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+}
+
+function getPredictionRangeLabel(rangeKey) {
+    return (REVENUE_PREDICTION_RANGES[rangeKey] ?? REVENUE_PREDICTION_RANGES['30d']).label;
+}
+
+function getEvaluationRangeLabel(rangeKey) {
+    return (REVENUE_EVALUATION_RANGES[rangeKey] ?? REVENUE_EVALUATION_RANGES['30d']).label;
+}
+
+function getPredictionDatasetByRange(rangeKey) {
+    const source = revenuePredictionData || {};
+    const useFull = rangeKey === 'all';
+    const labelsSource = useFull ? (source.full_labels ?? source.labels ?? []) : (source.labels ?? []);
+    const valuesSource = useFull ? (source.full_values ?? source.values ?? []) : (source.values ?? []);
+    const lowerSource = useFull ? (source.full_lower ?? source.lower ?? []) : (source.lower ?? []);
+    const upperSource = useFull ? (source.full_upper ?? source.upper ?? []) : (source.upper ?? []);
+
+    const zipped = labelsSource.map((label, index) => ({
+        label,
+        value: valuesSource[index],
+        lower: lowerSource[index],
+        upper: upperSource[index],
+    })).sort((a, b) => new Date(a.label) - new Date(b.label));
+
+    const labels = zipped.map(item => item.label);
+    const values = zipped.map(item => item.value);
+    const lower = zipped.map(item => item.lower);
+    const upper = zipped.map(item => item.upper);
+    const limitValue = REVENUE_PREDICTION_RANGES[rangeKey]?.limit;
+    const limit = typeof limitValue === 'number' && limitValue > 0 ? limitValue : null;
+
+    if (!limit) {
+        return { labels, values, lower, upper };
+    }
+
+    return {
+        labels: labels.slice(0, limit),
+        values: values.slice(0, limit),
+        lower: lower.slice(0, limit),
+        upper: upper.slice(0, limit),
+    };
+}
+
+function getEvaluationDatasetByRange(rangeKey) {
+    const source = revenueEvaluationData || {};
+    const labels = [...(source.labels ?? [])];
+    const real = [...(source.real ?? [])];
+    const predicted = [...(source.predicted ?? [])];
+    const limit = REVENUE_EVALUATION_RANGES[rangeKey]?.limit;
+
+    if (!limit || limit >= labels.length || limit <= 0) {
+        return { labels, real, predicted };
+    }
+
+    const startIndex = Math.max(labels.length - limit, 0);
+    return {
+        labels: labels.slice(startIndex),
+        real: real.slice(startIndex),
+        predicted: predicted.slice(startIndex),
+    };
+}
+
+function computeEvaluationMetrics(real = [], predicted = []) {
+    const mae = computeMae(real, predicted);
+    const rmse = computeRmse(real, predicted);
+    const mape = computeMape(real, predicted);
+    return {
+        mae,
+        rmse,
+        mape,
+    };
+}
+
+function computeMae(real = [], predicted = []) {
+    const length = Math.min(real.length, predicted.length);
+    if (!length) return 0;
+    let sum = 0;
+    for (let i = 0; i < length; i += 1) {
+        sum += Math.abs((real[i] ?? 0) - (predicted[i] ?? 0));
+    }
+    return sum / length;
+}
+
+function computeRmse(real = [], predicted = []) {
+    const length = Math.min(real.length, predicted.length);
+    if (!length) return 0;
+    let sum = 0;
+    for (let i = 0; i < length; i += 1) {
+        const diff = (real[i] ?? 0) - (predicted[i] ?? 0);
+        sum += diff ** 2;
+    }
+    return Math.sqrt(sum / length);
+}
+
+function computeMape(real = [], predicted = []) {
+    const length = Math.min(real.length, predicted.length);
+    if (!length) return 0;
+    let validCount = 0;
+    let sum = 0;
+    for (let i = 0; i < length; i += 1) {
+        const realValue = real[i] ?? 0;
+        if (realValue === 0) continue;
+        const diff = Math.abs(realValue - (predicted[i] ?? 0));
+        sum += (diff / Math.abs(realValue)) * 100;
+        validCount += 1;
+    }
+    if (!validCount) return 0;
+    return sum / validCount;
+}
+
+function enforcePredictionColors(chartInstance, options = {}) {
+    if (!chartInstance || !options) return;
+    const colors = options.colors ?? ['#3b82f6', '#22c55e', '#f97316'];
+    const stroke = options.stroke ?? {};
+    chartInstance.updateOptions({
+        colors,
+        stroke: {
+            ...stroke,
+            colors: stroke.colors ?? colors,
+        },
+    }, false, true);
+}
+
 function formatPercentage(value) {
     const parsed = Number(value || 0);
     return `${parsed.toFixed(1)}%`;
@@ -890,18 +1073,75 @@ function loadRevenuePredictions() {
 
     axios.get('/dashboard/predicciones/ingresos')
         .then(({ data }) => {
+            revenuePredictionData = data;
             if (!data || !(data.labels || []).length) {
+                revenuePredictionData = null;
+                if (revenuePredictionChart) {
+                    revenuePredictionChart.destroy();
+                    revenuePredictionChart = null;
+                }
                 if (chartEl) chartEl.classList.add('d-none');
                 if (emptyEl) emptyEl.classList.remove('d-none');
                 return;
             }
-            const chart = new ApexCharts(chartEl, buildRevenuePredictionOptions(data));
-            chart.render();
+
+            activeRevenuePredictionRange = activeRevenuePredictionRange || '30d';
+            updateRangeDropdownLabel('revenuePredictionRangeLabel', getPredictionRangeLabel(activeRevenuePredictionRange));
+            setActiveRangeItems('.revenue-prediction-range', activeRevenuePredictionRange);
+            renderRevenuePredictionChart();
+            bindRevenuePredictionRangeEvents();
         })
         .catch(() => {
             if (chartEl) chartEl.classList.add('d-none');
             if (emptyEl) emptyEl.classList.remove('d-none');
         });
+}
+
+function renderRevenuePredictionChart() {
+    const chartEl = document.getElementById('revenuePredictionChart');
+    const emptyEl = document.getElementById('revenuePredictionEmpty');
+    if (!chartEl) return;
+
+    const dataset = getPredictionDatasetByRange(activeRevenuePredictionRange);
+    if (!dataset.labels.length) {
+        if (revenuePredictionChart) {
+            revenuePredictionChart.destroy();
+            revenuePredictionChart = null;
+        }
+        chartEl.classList.add('d-none');
+        if (emptyEl) emptyEl.classList.remove('d-none');
+        return;
+    }
+
+    chartEl.classList.remove('d-none');
+    if (emptyEl) emptyEl.classList.add('d-none');
+
+    if (revenuePredictionChart) {
+        revenuePredictionChart.destroy();
+        revenuePredictionChart = null;
+    }
+
+    const options = buildRevenuePredictionOptions(dataset);
+    revenuePredictionChart = new ApexCharts(chartEl, options);
+    revenuePredictionChart.render().then(() => {
+        enforcePredictionColors(revenuePredictionChart, options);
+    });
+}
+
+function bindRevenuePredictionRangeEvents() {
+    if (revenuePredictionRangeBound) return;
+    document.querySelectorAll('.revenue-prediction-range').forEach((item) => {
+        item.addEventListener('click', (event) => {
+            event.preventDefault();
+            const range = item.getAttribute('data-range');
+            if (!range || range === activeRevenuePredictionRange) return;
+            activeRevenuePredictionRange = range;
+            updateRangeDropdownLabel('revenuePredictionRangeLabel', getPredictionRangeLabel(range));
+            setActiveRangeItems('.revenue-prediction-range', range);
+            renderRevenuePredictionChart();
+        });
+    });
+    revenuePredictionRangeBound = true;
 }
 
 function buildRevenuePredictionOptions(dataset = {}) {
@@ -912,12 +1152,22 @@ function buildRevenuePredictionOptions(dataset = {}) {
 
     return {
         chart: { type: 'line', height: 360, toolbar: { show: false } },
-        stroke: { width: [3, 2, 2], dashArray: [0, 6, 6] },
-        colors: ['#405189', '#0AB39C', '#F06548'],
+        stroke: {
+            width: [3, 2, 2],
+            dashArray: [0, 7, 7],
+            curve: 'smooth',
+            colors: ['#3b82f6', '#22c55e', '#f97316'],
+        },
+        markers: {
+            size: 3,
+            strokeWidth: 2,
+            hover: { sizeOffset: 2 },
+        },
+        colors: ['#3b82f6', '#22c55e', '#f97316'],
         series: [
-            { name: 'Ingreso Predicho', data: values },
-            { name: 'Límite Superior', data: upper },
-            { name: 'Límite Inferior', data: lower },
+            { name: 'Ingreso Predicho', data: values, color: '#3b82f6' },
+            { name: 'Límite Superior', data: upper, color: '#22c55e' },
+            { name: 'Límite Inferior', data: lower, color: '#f97316' },
         ],
         xaxis: {
             categories: labels,
@@ -932,11 +1182,11 @@ function buildRevenuePredictionOptions(dataset = {}) {
             y: { formatter: (val) => formatCurrency(val) },
         },
         fill: {
-            type: 'gradient',
+            type: ['gradient', 'solid', 'solid'],
             gradient: {
                 shadeIntensity: 1,
-                opacityFrom: 0.4,
-                opacityTo: 0,
+                opacityFrom: 0.25,
+                opacityTo: 0.05,
                 stops: [0, 90, 100],
             },
         },
@@ -948,6 +1198,7 @@ function buildRevenuePredictionOptions(dataset = {}) {
 function loadTopPredictedProducts() {
     const chartEl = document.getElementById('topPredictedProductsChart');
     const emptyEl = document.getElementById('topPredictedProductsEmpty');
+    const rangeEl = document.getElementById('topPredictedProductsRange');
     if (!chartEl) return;
 
     axios.get('/dashboard/predicciones/productos')
@@ -955,8 +1206,14 @@ function loadTopPredictedProducts() {
             if (!data || !(data.labels || []).length) {
                 if (chartEl) chartEl.classList.add('d-none');
                 if (emptyEl) emptyEl.classList.remove('d-none');
+                if (rangeEl) {
+                    rangeEl.textContent = '';
+                    rangeEl.classList.add('d-none');
+                }
                 return;
             }
+
+            updateTopPredictedProductsRange(rangeEl, data.start_date, data.end_date);
 
             const chart = new ApexCharts(chartEl, buildTopPredictedProductsOptions(data));
             chart.render();
@@ -964,6 +1221,10 @@ function loadTopPredictedProducts() {
         .catch(() => {
             if (chartEl) chartEl.classList.add('d-none');
             if (emptyEl) emptyEl.classList.remove('d-none');
+            if (rangeEl) {
+                rangeEl.textContent = '';
+                rangeEl.classList.add('d-none');
+            }
         });
 }
 
@@ -982,7 +1243,7 @@ function buildTopPredictedProductsOptions(dataset = {}) {
         },
         dataLabels: {
             enabled: true,
-            formatter: (val) => `${Number(val || 0).toFixed(0)} uds`,
+            formatter: (val) => Number(val || 0).toFixed(0),
             offsetX: 10,
         },
         series: [{ name: 'Cantidad Predicha', data: values }],
@@ -997,6 +1258,19 @@ function buildTopPredictedProductsOptions(dataset = {}) {
     };
 }
 
+function updateTopPredictedProductsRange(rangeEl, startDate, endDate) {
+    if (!rangeEl) return;
+    const label = formatPredictionRange(startDate, endDate);
+    if (!label) {
+        rangeEl.textContent = '';
+        rangeEl.classList.add('d-none');
+        return;
+    }
+
+    rangeEl.textContent = `Pronóstico ${label}`;
+    rangeEl.classList.remove('d-none');
+}
+
 function loadRevenueEvaluation() {
     const chartEl = document.getElementById('revenueEvaluationChart');
     const emptyEl = document.getElementById('revenueEvaluationEmpty');
@@ -1004,23 +1278,84 @@ function loadRevenueEvaluation() {
 
     axios.get('/dashboard/predicciones/evaluacion')
         .then(({ data }) => {
+            revenueEvaluationData = data;
             const labels = data.labels ?? [];
             if (!labels.length) {
+                revenueEvaluationData = null;
+                if (revenueEvaluationChart) {
+                    revenueEvaluationChart.destroy();
+                    revenueEvaluationChart = null;
+                }
                 chartEl.classList.add('d-none');
                 if (emptyEl) emptyEl.classList.remove('d-none');
+                updateText('evalMae', formatCompactCurrency(0));
+                updateText('evalRmse', formatCompactCurrency(0));
+                updateText('evalMape', '0%');
                 return;
             }
-            updateText('evalMae', formatCompactCurrency(data.mae ?? 0));
-            updateText('evalRmse', formatCompactCurrency(data.rmse ?? 0));
-            updateText('evalMape', `${Number(data.mape || 0).toFixed(2)}%`);
 
-            const chart = new ApexCharts(chartEl, buildRevenueEvaluationOptions(data));
-            chart.render();
+            activeRevenueEvaluationRange = activeRevenueEvaluationRange || '30d';
+            updateRangeDropdownLabel('revenueEvaluationRangeLabel', getEvaluationRangeLabel(activeRevenueEvaluationRange));
+            setActiveRangeItems('.revenue-evaluation-range', activeRevenueEvaluationRange);
+            renderRevenueEvaluationChart();
+            bindRevenueEvaluationRangeEvents();
         })
         .catch(() => {
             if (chartEl) chartEl.classList.add('d-none');
             if (emptyEl) emptyEl.classList.remove('d-none');
         });
+}
+
+function renderRevenueEvaluationChart() {
+    const chartEl = document.getElementById('revenueEvaluationChart');
+    const emptyEl = document.getElementById('revenueEvaluationEmpty');
+    if (!chartEl) return;
+
+    const dataset = getEvaluationDatasetByRange(activeRevenueEvaluationRange);
+    if (!dataset.labels.length) {
+        if (revenueEvaluationChart) {
+            revenueEvaluationChart.destroy();
+            revenueEvaluationChart = null;
+        }
+        chartEl.classList.add('d-none');
+        if (emptyEl) emptyEl.classList.remove('d-none');
+        updateText('evalMae', formatCompactCurrency(0));
+        updateText('evalRmse', formatCompactCurrency(0));
+        updateText('evalMape', '0%');
+        return;
+    }
+
+    chartEl.classList.remove('d-none');
+    if (emptyEl) emptyEl.classList.add('d-none');
+
+    const metrics = computeEvaluationMetrics(dataset.real, dataset.predicted);
+    updateText('evalMae', formatCompactCurrency(metrics.mae));
+    updateText('evalRmse', formatCompactCurrency(metrics.rmse));
+    updateText('evalMape', `${metrics.mape.toFixed(2)}%`);
+
+    if (revenueEvaluationChart) {
+        revenueEvaluationChart.destroy();
+        revenueEvaluationChart = null;
+    }
+
+    revenueEvaluationChart = new ApexCharts(chartEl, buildRevenueEvaluationOptions(dataset));
+    revenueEvaluationChart.render();
+}
+
+function bindRevenueEvaluationRangeEvents() {
+    if (revenueEvaluationRangeBound) return;
+    document.querySelectorAll('.revenue-evaluation-range').forEach((item) => {
+        item.addEventListener('click', (event) => {
+            event.preventDefault();
+            const range = item.getAttribute('data-range');
+            if (!range || range === activeRevenueEvaluationRange) return;
+            activeRevenueEvaluationRange = range;
+            updateRangeDropdownLabel('revenueEvaluationRangeLabel', getEvaluationRangeLabel(range));
+            setActiveRangeItems('.revenue-evaluation-range', range);
+            renderRevenueEvaluationChart();
+        });
+    });
+    revenueEvaluationRangeBound = true;
 }
 
 function buildRevenueEvaluationOptions(dataset = {}) {
@@ -1156,4 +1491,3 @@ function normalizeMonthKey(year, monthIndex) {
     const normalizedMonth = String(monthIndex + 1).padStart(2, '0');
     return `${year}-${normalizedMonth}`;
 }
-

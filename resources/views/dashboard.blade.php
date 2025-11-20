@@ -660,7 +660,30 @@
                     <div class="card card-animate h-100">
                         <div class="card-header d-flex align-items-center justify-content-between">
                             <h4 class="card-title mb-0 flex-grow-1">Proyección de Ingresos (30 días)</h4>
-                            <span class="badge bg-soft-info text-info">Forecast</span>
+                            <div class="d-flex flex-wrap align-items-center gap-3">
+                                <span class="badge bg-soft-info text-info">Forecast</span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-uppercase fs-13 fw-semibold text-dark">Ordenar por:</span>
+                                    <div class="dropdown">
+                                        <a class="text-muted dropdown-toggle fw-medium" href="#" role="button"
+                                            data-bs-toggle="dropdown" aria-expanded="false"
+                                            id="revenuePredictionRangeLabel">
+                                            Próximos 30 días
+                                        </a>
+                                        <div class="dropdown-menu dropdown-menu-end">
+                                            <a class="dropdown-item revenue-prediction-range" data-range="7d"
+                                                href="#">Próximos 7 días</a>
+                                            <a class="dropdown-item revenue-prediction-range" data-range="15d"
+                                                href="#">Próximos 15 días</a>
+                                            <a class="dropdown-item revenue-prediction-range active" data-range="30d"
+                                                href="#">Próximos 30 días</a>
+                                            <div class="dropdown-divider"></div>
+                                            <a class="dropdown-item revenue-prediction-range" data-range="all"
+                                                href="#">Todo el horizonte</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="card-body">
                             <div id="revenuePredictionChart" class="apex-charts" style="min-height: 350px;"></div>
@@ -677,6 +700,7 @@
                             <span class="badge bg-soft-success text-success">Top 10</span>
                         </div>
                         <div class="card-body">
+                            <p id="topPredictedProductsRange" class="text-muted text-uppercase fs-13 mb-2 d-none"></p>
                             <div id="topPredictedProductsChart" class="apex-charts" style="min-height: 350px;"></div>
                             <div id="topPredictedProductsEmpty" class="text-center text-muted py-5 d-none">
                                 No hay datos de productos pronosticados.
@@ -689,8 +713,36 @@
             <div class="row">
                 <div class="col-12">
                     <div class="card card-animate mt-4">
-                        <div class="card-header flex-wrap d-flex align-items-center justify-content-between gap-2">
-                            <h4 class="card-title mb-0 flex-grow-1">Evaluación de Predicciones vs. Reales</h4>
+                        <div class="card-header flex-wrap d-flex align-items-center justify-content-between gap-3">
+                            <div class="d-flex flex-wrap align-items-center gap-3 flex-grow-1">
+                                <h4 class="card-title mb-0">Evaluación de Predicciones vs. Reales</h4>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-uppercase fs-13 fw-semibold text-dark">Ordenar por:</span>
+                                    <div class="dropdown">
+                                        <a class="text-muted dropdown-toggle fw-medium" href="#" role="button"
+                                            data-bs-toggle="dropdown" aria-expanded="false"
+                                            id="revenueEvaluationRangeLabel">
+                                            Últimos 30 días
+                                        </a>
+                                        <div class="dropdown-menu">
+                                            <a class="dropdown-item revenue-evaluation-range" data-range="7d"
+                                                href="#">Últimos 7 días</a>
+                                            <a class="dropdown-item revenue-evaluation-range" data-range="15d"
+                                                href="#">Últimos 15 días</a>
+                                            <a class="dropdown-item revenue-evaluation-range active" data-range="30d"
+                                                href="#">Últimos 30 días</a>
+                                            <div class="dropdown-divider"></div>
+                                            <a class="dropdown-item revenue-evaluation-range" data-range="60d"
+                                                href="#">Últimos 60 días</a>
+                                            <a class="dropdown-item revenue-evaluation-range" data-range="90d"
+                                                href="#">Últimos 90 días</a>
+                                            <div class="dropdown-divider"></div>
+                                            <a class="dropdown-item revenue-evaluation-range" data-range="all"
+                                                href="#">Todo el histórico</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="d-flex flex-wrap gap-2">
                                 <span class="badge bg-soft-primary text-primary">
                                     MAE: <span id="evalMae">0</span>
