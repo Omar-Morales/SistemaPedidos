@@ -152,19 +152,6 @@ def evaluate_revenue_predictions(engine: Engine) -> dict:
         logging.info("No hay coincidencias entre predicciones y valores reales para evaluar.")
         return {}
 
-    if inspector.has_table(EVAL_REVENUE_TABLE):
-        existentes = pd.read_sql(
-            f"SELECT fecha FROM {EVAL_REVENUE_TABLE}",
-            engine,
-            parse_dates=["fecha"],
-        )
-        if not existentes.empty:
-            merged = merged[~merged["fecha"].isin(existentes["fecha"])]
-
-    if merged.empty:
-        logging.info("Todas las fechas reales ya fueron evaluadas previamente.")
-        return {}
-
     merged["error"] = merged["ingreso_real"] - merged["ingreso_predicho"]
     merged["error_absoluto"] = merged["error"].abs()
     merged["error_cuadratico"] = merged["error"] ** 2
@@ -175,6 +162,14 @@ def evaluate_revenue_predictions(engine: Engine) -> dict:
 
     df_evaluacion = merged[["fecha", "ingreso_predicho", "ingreso_real", "error_absoluto", "error_cuadratico", "error_porcentual"]]
     df_evaluacion["fecha"] = df_evaluacion["fecha"].dt.date
+
+    if inspector.has_table(EVAL_REVENUE_TABLE) and not df_evaluacion.empty:
+        dates = list(df_evaluacion["fecha"])
+        with engine.begin() as conn:
+            conn.execute(
+                text(f"DELETE FROM {EVAL_REVENUE_TABLE} WHERE fecha = ANY(:dates)"),
+                {"dates": dates},
+            )
     df_evaluacion.to_sql(EVAL_REVENUE_TABLE, engine, if_exists="append", index=False)
     logging.info("Evaluación guardada para %d fechas en %s.", len(df_evaluacion), EVAL_REVENUE_TABLE)
 
