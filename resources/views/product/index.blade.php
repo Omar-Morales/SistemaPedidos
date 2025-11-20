@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Mantenimiento de Productos')
+@section('title', 'Productos')
 
 @section('content')
 @php

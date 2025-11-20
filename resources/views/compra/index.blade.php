@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Mantenimiento de Compras')
+@section('title', 'Compras')
 
 @section('content')
 <div class="page-content">

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Mantenimiento de Proveedores')
+@section('title', 'Proveedores')
 
 @section('content')
 <div class="page-content">

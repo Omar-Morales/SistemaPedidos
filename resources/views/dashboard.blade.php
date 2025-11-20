@@ -143,21 +143,9 @@
 
 
                                 <div class="avatar-sm flex-shrink-0">
-
-
-
-                                    <span class="avatar-title bg-soft-warning text-warning rounded-circle fs-2">
-
-
-
+                                    <span class="avatar-title bg-soft-danger text-danger rounded-circle fs-2">
                                         <i class="ri-wallet-line"></i>
-
-
-
                                     </span>
-
-
-
                                 </div>
 
 
@@ -170,7 +158,7 @@
 
 
 
-                                <span class="badge bg-soft-warning text-warning mb-3">
+                                <span class="badge bg-soft-danger text-danger mb-3">
 
 
 
@@ -245,21 +233,9 @@
 
 
                                 <div class="avatar-sm flex-shrink-0">
-
-
-
-                                    <span class="avatar-title bg-soft-danger text-danger rounded-circle fs-2">
-
-
-
+                                    <span class="avatar-title bg-soft-warning text-warning rounded-circle fs-2">
                                         <i class="ri-money-dollar-circle-line"></i>
-
-
-
                                     </span>
-
-
-
                                 </div>
 
 
@@ -272,7 +248,7 @@
 
 
 
-                                <span class="badge bg-soft-danger text-danger mb-3">
+                                <span class="badge bg-soft-warning text-warning mb-3">
 
 
 
