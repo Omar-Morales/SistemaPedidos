@@ -707,10 +707,27 @@ ventasTableColumns.push(
 
 ventasTableColumns.push({ data: 'acciones', name: 'acciones', orderable: false, searchable: false });
 
+const $filterStartDate = $('#filterStartDate');
+const $filterEndDate = $('#filterEndDate');
+const $filterWarehouse = $('#filterWarehouse');
+const $resetFilters = $('#btnResetFilters');
+const defaultStartDate = $filterStartDate.data('default') || '';
+const defaultEndDate = $filterEndDate.data('default') || '';
+const defaultWarehouseFilter = ($filterWarehouse.data('default') ?? '').toString();
+
 const table = $('#ventasTable').DataTable({
     processing: true,
     serverSide: true,
-    ajax: '/ventas/data',
+    ajax: {
+        url: '/ventas/data',
+        data: function (data) {
+            data.start_date = $filterStartDate.val();
+            data.end_date = $filterEndDate.val();
+            if ($filterWarehouse.length) {
+                data.warehouse = $filterWarehouse.val();
+            }
+        },
+    },
     columns: ventasTableColumns,
     language: { url: '/assets/js/es-ES.json' },
     responsive: true,
@@ -732,6 +749,33 @@ const table = $('#ventasTable').DataTable({
         }
     ]
 });
+
+const reloadWithFilters = () => table.ajax.reload();
+
+[$filterStartDate, $filterEndDate].forEach(($element) => {
+    if ($element.length) {
+        $element.on('change', () => reloadWithFilters());
+    }
+});
+
+if ($filterWarehouse.length) {
+    $filterWarehouse.on('change', () => reloadWithFilters());
+}
+
+if ($resetFilters.length) {
+    $resetFilters.on('click', () => {
+        if ($filterStartDate.length) {
+            $filterStartDate.val(defaultStartDate);
+        }
+        if ($filterEndDate.length) {
+            $filterEndDate.val(defaultEndDate);
+        }
+        if ($filterWarehouse.length) {
+            $filterWarehouse.val(defaultWarehouseFilter);
+        }
+        reloadWithFilters();
+    });
+}
 // Personalizar los estilos al cambiar visibilidad de columnas
 
         function updateColvisStyles() {
