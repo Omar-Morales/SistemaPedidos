@@ -381,7 +381,7 @@ class VentaController extends Controller
             'sale_date' => 'nullable|date',
             'payment_method' => $this->paymentMethodRule(),
             'delivery_type' => 'nullable|in:pickup,delivery',
-            'warehouse' => 'nullable|in:curva,milla,santa_carolina',
+            'warehouse' => 'nullable|in:curva,milla,santa_carolina,tienda',
         ]);
 
         $cliente = Customer::find($request->customer_id);
@@ -423,7 +423,7 @@ class VentaController extends Controller
             $deliveryDetalle = $item['delivery_type'] ?? $request->delivery_type;
             $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
-            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
+            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina', 'tienda'], true)) {
                 return response()->json([
                     'message' => "Almacen invalido para el item {$index}.",
                 ], 422);
@@ -455,7 +455,7 @@ class VentaController extends Controller
             $deliveryDetalle = $item['delivery_type'] ?? $venta->delivery_type;
             $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
-            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
+            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina', 'tienda'], true)) {
                 return response()->json([
                     'message' => "Almacen invalido para el item {$index}.",
                 ], 422);
@@ -494,7 +494,7 @@ class VentaController extends Controller
             $deliveryDetalle = $item['delivery_type'] ?? $request->delivery_type;
             $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
-            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
+            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina', 'tienda'], true)) {
                 return response()->json([
                     'message' => "Almacen invalido para el item {$index}.",
                 ], 422);
@@ -524,7 +524,7 @@ class VentaController extends Controller
             $deliveryDetalle = $item['delivery_type'] ?? $request->delivery_type;
             $paymentMethodDetalle = $item['payment_method'] ?? $paymentMethodVenta;
 
-            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
+            if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina', 'tienda'], true)) {
                 return response()->json([
                     'message' => "Almacen invalido para el item {$index}.",
                 ], 422);
@@ -773,7 +773,7 @@ class VentaController extends Controller
             'sale_date' => 'nullable|date',
             'payment_method' => $this->paymentMethodRule('required'),
             'delivery_type' => 'required|in:pickup,delivery',
-            'warehouse' => 'required|in:curva,milla,santa_carolina',
+            'warehouse' => 'required|in:curva,milla,santa_carolina,tienda',
             'codigo' => 'nullable|string|max:50|unique:ventas,codigo,' . $venta->id,
         ]);
 
@@ -988,7 +988,7 @@ class VentaController extends Controller
             'sale_date' => 'nullable|date',
             'payment_method' => $this->paymentMethodRule(),
             'delivery_type' => 'nullable|in:pickup,delivery',
-            'warehouse' => 'nullable|in:curva,milla,santa_carolina',
+            'warehouse' => 'nullable|in:curva,milla,santa_carolina,tienda',
         ]);
 
         $detailInput = $request->input('detail');
@@ -1012,7 +1012,7 @@ class VentaController extends Controller
             'payment_status' => 'nullable|in:pending,paid,to_collect,change,cancelled',
             'status' => 'nullable|in:pending,in_progress,delivered,cancelled',
             'difference' => 'nullable|numeric',
-            'warehouse' => 'nullable|in:curva,milla,santa_carolina',
+            'warehouse' => 'nullable|in:curva,milla,santa_carolina,tienda',
             'delivery_type' => 'nullable|in:pickup,delivery',
             'payment_method' => $this->paymentMethodRule(),
         ])->validate();
@@ -1039,7 +1039,7 @@ class VentaController extends Controller
             ?? $this->normalizePaymentMethod($detalle->payment_method)
             ?? $paymentMethodVenta;
 
-        if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina'], true)) {
+        if (!in_array($warehouseDetalle, ['curva', 'milla', 'santa_carolina', 'tienda'], true)) {
             return response()->json(['message' => 'Almacen invalido para el detalle.'], 422);
         }
 
@@ -1467,6 +1467,7 @@ class VentaController extends Controller
                 return match ($detalle->detalle_warehouse) {
                     'milla' => 'Milla',
                     'santa_carolina' => 'Santa Carolina',
+                    'tienda' => 'Tienda',
                     default => 'Curva',
                 };
             })

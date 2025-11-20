@@ -140,10 +140,11 @@
                                 <label for="warehouse" class="form-label">Almacen</label>
                                 <select class="form-select" id="warehouse" name="warehouse" required>
                                     <option value="">-- Seleccione --</option>
-                                    <option value="curva">Curva</option>
-                                    <option value="milla">Milla</option>
-                                    <option value="santa_carolina">Santa Carolina</option>
-                                </select>
+                                     <option value="curva">Curva</option>
+                                     <option value="milla">Milla</option>
+                                     <option value="santa_carolina">Santa Carolina</option>
+                                     <option value="tienda">Tienda</option>
+                                 </select>
                             </div>
 
                             @if (!$isWarehouseRole)

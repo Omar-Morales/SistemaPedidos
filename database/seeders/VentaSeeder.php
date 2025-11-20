@@ -41,7 +41,7 @@ class VentaSeeder extends Seeder
                     'difference' => 0,
                     'payment_method' => 'efectivo',
                     'delivery_type' => rand(0, 1) ? 'pickup' : 'delivery',
-                    'warehouse' => collect(['curva','milla','santa_carolina'])->random(),
+                    'warehouse' => collect(['curva','milla','santa_carolina','tienda'])->random(),
                     'codigo' => 'TEMP',
                 ]);
 
@@ -102,4 +102,3 @@ class VentaSeeder extends Seeder
         });
     }
 }
-
