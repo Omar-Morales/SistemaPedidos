@@ -37,6 +37,15 @@ COPY . .
 COPY --from=composer-build /var/www/html/vendor ./vendor
 COPY --from=node-build /app/public/build ./public/build
 
+RUN mkdir -p \
+        storage/framework/cache/data \
+        storage/framework/sessions \
+        storage/framework/testing \
+        storage/framework/views \
+        bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
+
 ENV APP_ENV=production \
     APP_DEBUG=false
 
