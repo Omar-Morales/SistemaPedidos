@@ -4,7 +4,7 @@ import logging
 import atexit
 import os
 
-from predicciones import run_all_predictions
+from scripts.predicciones import run_all_predictions
 
 app = Flask(__name__)
 
