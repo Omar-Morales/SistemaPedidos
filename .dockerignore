@@ -1,5 +1,4 @@
 .git
-.gitignore
 node_modules
 vendor
 storage/framework/cache/data
@@ -10,4 +9,3 @@ storage/logs
 .env
 .env.*
 Dockerfile
-render.yaml
