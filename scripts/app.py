@@ -4,7 +4,10 @@ import logging
 import atexit
 import os
 
-from scripts.predicciones import run_all_predictions
+try:
+    from scripts.predicciones import run_all_predictions
+except ImportError:
+    from predicciones import run_all_predictions
 
 app = Flask(__name__)
 
