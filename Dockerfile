@@ -7,9 +7,13 @@ RUN apt-get update \
         unzip \
         libpq-dev \
         libzip-dev \
+        libfreetype6-dev \
+        libjpeg62-turbo-dev \
+        libpng-dev \
         nodejs \
         npm \
-    && docker-php-ext-install pdo pdo_pgsql zip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_pgsql zip gd \
     && npm install -g npm@10 \
     && rm -rf /var/lib/apt/lists/*
 
